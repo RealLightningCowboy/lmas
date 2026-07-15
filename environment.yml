@@ -1,0 +1,19 @@
+name: lmas
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip
+  - numpy>=1.26
+  - xarray>=2024.1
+  - matplotlib>=3.8
+  - scipy>=1.11
+  - pyyaml>=6.0
+  - pandas>=2.0
+  - h5py>=3.10
+  - pyside6>=6.6
+  - cartopy>=0.23
+  - pyvista>=0.44
+  - vtk>=9.3
+  - imageio>=2.34
+  - imageio-ffmpeg>=0.5

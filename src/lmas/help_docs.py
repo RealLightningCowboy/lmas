@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+from importlib.resources import files
+
+
+WHAT_LMAS_CAN_DO = "WHAT_LMAS_CAN_DO.md"
+USER_MANUAL = "USER_MANUAL.md"
+LINEAGE_AND_ATTRIBUTION = "LINEAGE_AND_ATTRIBUTION.md"
+DEVELOPMENT_PROVENANCE = "DEVELOPMENT_PROVENANCE.md"
+RELEASE_NOTES = "RELEASE_NOTES.md"
+KNOWN_LIMITATIONS = "KNOWN_LIMITATIONS.md"
+CHANGELOG = "CHANGELOG.md"
+POLARITY_PRODUCT_FORMAT = "POLARITY_PRODUCT_FORMAT.md"
+NETWORK_OVERLAYS = "NETWORK_OVERLAYS.md"
+
+_HELP_DOCUMENTS = {
+    WHAT_LMAS_CAN_DO,
+    USER_MANUAL,
+    LINEAGE_AND_ATTRIBUTION,
+    DEVELOPMENT_PROVENANCE,
+    RELEASE_NOTES,
+    KNOWN_LIMITATIONS,
+    CHANGELOG,
+    POLARITY_PRODUCT_FORMAT,
+    NETWORK_OVERLAYS,
+}
+
+
+def read_help_document(name: str) -> str:
+    if name not in _HELP_DOCUMENTS:
+        raise ValueError(f"Unknown LMAS help document: {name}")
+    return files("lmas.docs").joinpath(name).read_text(encoding="utf-8")
+
+
+__all__ = [
+    "CHANGELOG",
+    "NETWORK_OVERLAYS",
+    "POLARITY_PRODUCT_FORMAT",
+    "KNOWN_LIMITATIONS",
+    "LINEAGE_AND_ATTRIBUTION",
+    "DEVELOPMENT_PROVENANCE",
+    "RELEASE_NOTES",
+    "USER_MANUAL",
+    "WHAT_LMAS_CAN_DO",
+    "read_help_document",
+]

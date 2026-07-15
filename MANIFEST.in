@@ -1,0 +1,28 @@
+include README.md
+include RELEASE_NOTES.md
+include CHANGELOG.md
+include KNOWN_LIMITATIONS.md
+include DEVELOPMENT_PROVENANCE.md
+include LINEAGE_AND_ATTRIBUTION.md
+include CREDITS.md
+include THIRD_PARTY_NOTICES.md
+include POLARITY_PRODUCT_FORMAT.md
+include INSTALLATION.md
+include CLI_REFERENCE.md
+include USER_MANUAL.md
+include WHAT_LMAS_CAN_DO.md
+include NATIVE_READERS.md
+include NETWORK_OVERLAYS.md
+include environment.yml
+include install.py
+recursive-include requirements *.txt
+recursive-include licenses *.txt *.md
+recursive-include examples *
+recursive-include tests *.py
+recursive-include src/lmas/docs *.md
+recursive-include src/lmas/resources *
+recursive-include docs *.md
+include src/lmas/resources/G16_corner_lut_fixedgrid.pickle
+
+global-exclude *.py[cod]
+global-exclude __pycache__

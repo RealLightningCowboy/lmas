@@ -1,0 +1,5 @@
+-r gui.txt
+pyvista>=0.44
+vtk>=9.3
+imageio>=2.34
+imageio-ffmpeg>=0.5

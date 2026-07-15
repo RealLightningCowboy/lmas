@@ -1,0 +1,54 @@
+format: lmas-profile-v1.0
+lmas_version: 1.2.0
+name: Startup
+filters:
+  start_time: null
+  end_time: null
+  minimum_stations: 6
+  maximum_chi2: 1.0
+  minimum_altitude_km: null
+  maximum_altitude_km: null
+  minimum_power: null
+  maximum_power: null
+  minimum_x_km: null
+  maximum_x_km: null
+  minimum_y_km: null
+  maximum_y_km: null
+plot:
+  layout: intfs
+  coordinate_system: local
+  show_histogram: false
+  text_size_preset: normal
+  color_by: time
+  cmap: turbo
+  theme: dark
+  point_size: 3.0
+  show_stations: true
+  show_station_labels: false
+  show_stations_in_vertical_projections: false
+  show_colorbar: true
+  show_grid: true
+  show_legend: false
+  show_panel_labels: false
+  reverse_cmap: false
+  log_color_scale: false
+  auto_fit_spatial: true
+  remap_time_colors: true
+  north_south_viewpoint: south
+  east_west_viewpoint: east
+  show_north_south_title: false
+  show_east_west_title: false
+  depth_mode: spatial
+  title: null
+  dpi: 100
+  saved_figure_dpi: 300
+  preview_point_limit: 12000
+  three_d_display_mode: cumulative
+  three_d_trail_ms: 30.0
+  three_d_afterimage_ms: 30.0
+  three_d_playback_fps: 30
+  three_d_playback_duration_s: 15.0
+  three_d_hold_end_s: 5.0
+  three_d_orbit_speed_deg_s: 14.0
+  three_d_interaction_mode: z-orbit
+  three_d_show_grid_and_labels: true

@@ -1,0 +1,177 @@
+format: lmas-project-v1.1
+lmas_version: 1.4.0
+name: 2019-04-30 Oklahoma LMA + GOES-R GLM demonstration
+source_files:
+- data/lma/LYLOUT_190430_144844_0060.dat.gz
+source_file_metadata:
+- filename: LYLOUT_190430_144844_0060.dat.gz
+  size_bytes: 1084016
+  fingerprint: sha256-sampled-v1:2034b317fc253374cd013b3dc6526d7f2896784aa3a116dc0672775e4ae40898
+dataset_fingerprint: sha256:592775cdd406a00f12e19c2f987a05e10135df0bfe7a42ccea7ac72aead0ee17
+reference:
+  latitude: 35.2791257
+  longitude: -97.9178678
+reader:
+  backend: native
+  version: '1'
+  details:
+    requested_backend: native
+filters:
+  start_time: null
+  end_time: null
+  minimum_stations: 6
+  maximum_chi2: 1.0
+  minimum_altitude_km: null
+  maximum_altitude_km: null
+  minimum_power: null
+  maximum_power: null
+  minimum_x_km: null
+  maximum_x_km: null
+  minimum_y_km: null
+  maximum_y_km: null
+view:
+  start_time: '2019-04-30T14:49:14.142212000'
+  end_time: '2019-04-30T14:49:15.079513000'
+  minimum_stations: null
+  maximum_chi2: null
+  minimum_altitude_km: -0.75
+  maximum_altitude_km: 22.158
+  minimum_power: null
+  maximum_power: null
+  minimum_x_km: 24.268
+  maximum_x_km: 51.392
+  minimum_y_km: 9.173
+  maximum_y_km: 41.24
+project_home:
+  time:
+  - 18016.61752479412
+  - 18016.617535642512
+  east:
+  - 24.267969492039292
+  - 51.39226828962672
+  north:
+  - 9.173049243764888
+  - 41.240249168259346
+  altitude:
+  - -0.75
+  - 22.15818021987864
+plot:
+  layout: intfs
+  coordinate_system: local
+  show_histogram: false
+  text_size_preset: normal
+  color_by: time
+  cmap: turbo
+  theme: dark
+  point_size: 3.0
+  show_stations: false
+  show_station_labels: false
+  show_stations_in_vertical_projections: false
+  show_colorbar: true
+  show_grid: true
+  show_legend: true
+  show_panel_labels: false
+  reverse_cmap: false
+  log_color_scale: false
+  auto_fit_spatial: true
+  remap_time_colors: true
+  north_south_viewpoint: south
+  east_west_viewpoint: east
+  show_north_south_title: false
+  show_east_west_title: false
+  depth_mode: spatial
+  title: null
+  dpi: 100
+  saved_figure_dpi: 300
+  preview_point_limit: 12000
+  three_d_display_mode: cumulative
+  three_d_trail_ms: 30.0
+  three_d_afterimage_ms: 30.0
+  three_d_playback_fps: 30
+  three_d_playback_duration_s: 15.0
+  three_d_hold_end_s: 5.0
+  three_d_orbit_speed_deg_s: 14.0
+  three_d_interaction_mode: z-orbit
+  three_d_show_grid_and_labels: true
+selection:
+  source_ids: null
+  color_norm_limits:
+  - 30.259172178
+  - 30.933985133
+analysis:
+  source_selection: {}
+  satellite_overlays:
+    format: lmas-satellite-overlays-v1
+    shared_energy_scale: true
+    glm_backend: native
+    datasets:
+    - provider: glm
+      key: glm:G16:1556635720000000000:1556635800000000000
+      source_files:
+      - data/glm/goes16_east/OR_GLM-L2-LCFA_G16_s20191201448400_e20191201449000_c20191201449024.nc
+      - data/glm/goes16_east/OR_GLM-L2-LCFA_G16_s20191201449000_e20191201449200_c20191201449224.nc
+      - data/glm/goes16_east/OR_GLM-L2-LCFA_G16_s20191201449200_e20191201449400_c20191201449425.nc
+      - data/glm/goes16_east/OR_GLM-L2-LCFA_G16_s20191201449400_e20191201450000_c20191201450023.nc
+      style:
+        enabled: false
+        show_event_footprints: true
+        show_group_centroids: true
+        show_flash_centroids: false
+        show_maximum_group: false
+        show_colorbar: true
+        show_group_time_rail: true
+        show_time_rail_labels: false
+        colormap: mako
+        logarithmic_energy: true
+        footprint_alpha: 0.9
+        footprint_edge_width: 0.2
+        group_marker_size: 15.0
+        group_marker_color: auto
+        group_edge_width: 0.55
+        maximum_group_size: 150.0
+        maximum_group_color: springgreen
+        footprint_zorder: 0.4
+        group_zorder: 0.6
+        time_rail_marker_size: 18.0
+        time_rail_zorder: 3.0
+        maximum_interactive_events: 5000
+        footprint_render_padding_fraction: 0.3333333333333333
+        format: lmas-glm-overlay-style-v2
+    - provider: glm
+      key: glm:G17:1556635720000000000:1556635800000000000
+      source_files:
+      - data/glm/goes17_west/OR_GLM-L2-LCFA_G17_s20191201448400_e20191201449000_c20191201449019.nc
+      - data/glm/goes17_west/OR_GLM-L2-LCFA_G17_s20191201449000_e20191201449200_c20191201449326.nc
+      - data/glm/goes17_west/OR_GLM-L2-LCFA_G17_s20191201449200_e20191201449400_c20191201449415.nc
+      - data/glm/goes17_west/OR_GLM-L2-LCFA_G17_s20191201449400_e20191201450000_c20191201450016.nc
+      style:
+        enabled: false
+        show_event_footprints: true
+        show_group_centroids: true
+        show_flash_centroids: false
+        show_maximum_group: false
+        show_colorbar: true
+        show_group_time_rail: true
+        show_time_rail_labels: false
+        colormap: mako
+        logarithmic_energy: true
+        footprint_alpha: 0.9
+        footprint_edge_width: 0.2
+        group_marker_size: 15.0
+        group_marker_color: auto
+        group_edge_width: 0.55
+        maximum_group_size: 150.0
+        maximum_group_color: springgreen
+        footprint_zorder: 0.4
+        group_zorder: 0.6
+        time_rail_marker_size: 18.0
+        time_rail_zorder: 3.0
+        maximum_interactive_events: 5000
+        footprint_render_padding_fraction: 0.3333333333333333
+        format: lmas-glm-overlay-style-v2
+notes: Packaged real-data LMAS demonstration. Includes a one-minute subset of the
+  2019-04-30 Oklahoma LMA record and matching GOES-16 East and GOES-17 West GLM L2
+  LCFA files. GLM overlays are loaded but disabled by default. No Earth Networks/ENTLN
+  data are redistributed.
+demo: false
+demo_event_count: 42513

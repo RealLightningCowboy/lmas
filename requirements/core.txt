@@ -1,0 +1,7 @@
+numpy>=1.26
+xarray>=2024.1
+matplotlib>=3.8
+scipy>=1.11
+PyYAML>=6.0
+pandas>=2.0
+h5py>=3.10

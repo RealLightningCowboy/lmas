@@ -1,0 +1,250 @@
+format: lmas-project-v1.1
+lmas_version: 1.2.0
+name: LMAS Synthetic Demonstration
+source_files: []
+reference:
+  latitude: 33.978
+  longitude: -107.181
+reader:
+  backend: synthetic
+  version: '1'
+  details:
+    source: release-example
+filters:
+  start_time: null
+  end_time: null
+  minimum_stations: 6
+  maximum_chi2: 1.0
+  minimum_altitude_km: null
+  maximum_altitude_km: null
+  minimum_power: null
+  maximum_power: null
+  minimum_x_km: null
+  maximum_x_km: null
+  minimum_y_km: null
+  maximum_y_km: null
+view:
+  start_time: null
+  end_time: null
+  minimum_stations: null
+  maximum_chi2: null
+  minimum_altitude_km: null
+  maximum_altitude_km: null
+  minimum_power: null
+  maximum_power: null
+  minimum_x_km: null
+  maximum_x_km: null
+  minimum_y_km: null
+  maximum_y_km: null
+plot:
+  layout: intfs
+  coordinate_system: local
+  show_histogram: false
+  text_size_preset: normal
+  color_by: time
+  cmap: turbo
+  theme: dark
+  point_size: 3.0
+  show_stations: true
+  show_station_labels: false
+  show_stations_in_vertical_projections: false
+  show_colorbar: true
+  show_grid: true
+  show_legend: false
+  show_panel_labels: false
+  reverse_cmap: false
+  log_color_scale: false
+  auto_fit_spatial: true
+  remap_time_colors: true
+  north_south_viewpoint: south
+  east_west_viewpoint: east
+  show_north_south_title: false
+  show_east_west_title: false
+  depth_mode: spatial
+  title: null
+  dpi: 100
+  saved_figure_dpi: 300
+  preview_point_limit: 12000
+  three_d_display_mode: cumulative
+  three_d_trail_ms: 30.0
+  three_d_afterimage_ms: 30.0
+  three_d_playback_fps: 30
+  three_d_playback_duration_s: 15.0
+  three_d_hold_end_s: 5.0
+  three_d_orbit_speed_deg_s: 14.0
+  three_d_interaction_mode: z-orbit
+  three_d_show_grid_and_labels: true
+selection:
+  source_ids: null
+  color_norm_limits: null
+analysis:
+  source_selection:
+    active_group: Review Region
+    groups:
+    - name: Review Region
+      source_ids:
+      - 30
+      - 31
+      - 32
+      - 33
+      - 34
+      - 35
+      - 36
+      - 37
+      - 38
+      - 39
+      - 40
+      - 41
+      - 42
+      - 43
+      - 44
+      - 45
+      - 46
+      - 47
+      - 48
+      - 49
+      - 50
+      - 51
+      - 52
+      - 53
+      - 54
+      - 55
+      - 56
+      - 57
+      - 58
+      - 59
+      - 60
+      visible: true
+      locked: false
+      color: '#ff4fd8'
+      display_style: outline
+      charge_category: unassigned
+      domain: custom
+      subtype: generic_selection
+      metadata: {}
+      created_utc: '2026-07-14T00:00:00Z'
+      modified_utc: '2026-07-14T00:00:00Z'
+      created_with_lmas_version: 1.2.0
+    - name: Example Positive
+      source_ids:
+      - 80
+      - 81
+      - 82
+      - 83
+      - 84
+      - 85
+      - 86
+      - 87
+      - 88
+      - 89
+      - 90
+      - 91
+      - 92
+      - 93
+      - 94
+      - 95
+      - 96
+      - 97
+      - 98
+      - 99
+      - 100
+      - 101
+      - 102
+      - 103
+      - 104
+      - 105
+      - 106
+      - 107
+      - 108
+      - 109
+      - 110
+      - 111
+      - 112
+      - 113
+      - 114
+      - 115
+      - 116
+      - 117
+      - 118
+      - 119
+      - 120
+      visible: true
+      locked: false
+      color: '#d62728'
+      display_style: recolor
+      charge_category: positive
+      created_utc: '2026-07-13T07:47:39Z'
+      modified_utc: '2026-07-13T07:47:39Z'
+      created_with_lmas_version: 1.2.0
+      domain: charge
+      subtype: polarity_group
+      metadata: {}
+    - name: Example Negative
+      source_ids:
+      - 500
+      - 501
+      - 502
+      - 503
+      - 504
+      - 505
+      - 506
+      - 507
+      - 508
+      - 509
+      - 510
+      - 511
+      - 512
+      - 513
+      - 514
+      - 515
+      - 516
+      - 517
+      - 518
+      - 519
+      - 520
+      - 521
+      - 522
+      - 523
+      - 524
+      - 525
+      - 526
+      - 527
+      - 528
+      - 529
+      - 530
+      - 531
+      - 532
+      - 533
+      - 534
+      - 535
+      - 536
+      - 537
+      - 538
+      - 539
+      - 540
+      visible: true
+      locked: false
+      color: '#0077ff'
+      display_style: recolor
+      charge_category: negative
+      created_utc: '2026-07-13T07:47:39Z'
+      modified_utc: '2026-07-13T07:47:39Z'
+      created_with_lmas_version: 1.2.0
+      domain: charge
+      subtype: polarity_group
+      metadata: {}
+    category_visibility:
+      unassigned: true
+      positive: true
+      negative: true
+    selection_scope: filtered
+    member_display_scope: filtered
+    charge_region_label: leader_polarity
+    active_groups_by_domain:
+      custom: Review Region
+      charge: Example Positive
+    show_charge_overlays_with_other_color_modes: false
+notes: Synthetic LMAS 1.2.0 example with Custom Selection and Charge Analysis groups.
+  All scientific assignments are illustrative only.
+demo: true
+demo_event_count: 1200

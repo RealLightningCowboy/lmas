@@ -1,0 +1,33 @@
+{
+  "format": "lmas-animation-batch-v0.1",
+  "jobs": [
+    {
+      "kind": "3d",
+      "output_path": "outputs/example_3d.mp4",
+      "theme": "dark",
+      "display_mode": "trail-afterimage",
+      "animation_mode": "develop-orbit"
+    }
+  ],
+  "overwrite_policy": "replace",
+  "continue_on_error": true,
+  "project_path": null,
+  "snapshot_path": "REPLACE_WITH_SNAPSHOT_PATH.npz",
+  "cancel_file": null,
+  "trail_ms": 30.0,
+  "afterimage_ms": 30.0,
+  "fps": 30,
+  "duration_s": 15.0,
+  "hold_end_s": 5.0,
+  "width": 1400,
+  "height": 900,
+  "video_quality": 7,
+  "orbit_speed_deg_s": 14.0,
+  "point_size": 5.0,
+  "cmap": "turbo",
+  "reverse_cmap": false,
+  "render_profile": "compatible",
+  "camera_path": null,
+  "custom_title": "",
+  "show_grid_and_labels": true
+}

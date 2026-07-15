@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lmas"
+version = "1.6.0"
+description = "Lightning Mapping Array Suite: modular viewing and analysis tools for solved LMA source data"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{name = "R. Stetson Reger"}]
+license = "MIT"
+license-files = ["LICENSE", "licenses/*.txt", "licenses/*.md"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Science/Research",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Atmospheric Science",
+  "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+  "numpy>=1.26",
+  "xarray>=2024.1",
+  "matplotlib>=3.8",
+  "scipy>=1.11",
+  "PyYAML>=6.0",
+  "pandas>=2.0",
+  "h5py>=3.10",
+]
+
+[project.optional-dependencies]
+gui = ["PySide6>=6.6", "cartopy>=0.23"]
+visualization = [
+  "pyvista>=0.44",
+  "vtk>=9.3",
+  "imageio>=2.34",
+  "imageio-ffmpeg>=0.5",
+]
+dev = ["pytest>=8", "build>=1.2"]
+all = [
+  "PySide6>=6.6",
+  "cartopy>=0.23",
+  "pyvista>=0.44",
+  "vtk>=9.3",
+  "imageio>=2.34",
+  "imageio-ffmpeg>=0.5",
+]
+
+[project.scripts]
+lma = "lmas.cli:main"
+lma-gui = "lmas.gui.app:main"
+lmas = "lmas.cli:main"
+lmas-gui = "lmas.gui.app:main"
+lmas-install-launcher = "lmas.launcher:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+lmas = ["docs/*.md", "resources/*", "resources/*.pickle", "resources/maps/*", "resources/demo/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.exclude-package-data]
+"*" = ["*.pyc", "*.pyo", "__pycache__/*"]
