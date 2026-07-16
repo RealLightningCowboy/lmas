@@ -4,11 +4,11 @@ LMAS is an open-source Python application for interactive, reproducible analysis
 
 LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/xlma-python), including its `pyxlma` package, and [glmtools](https://github.com/deeplycloudy/glmtools), developed by Eric Bruning and collaborators. LMAS’s native readers and portions of its plotting and GLM geometry implementation derive from those projects. LMAS adds an integrated desktop application, linked analysis workflows, Projects and Profiles, overlay management, and scientific exports.
 
+[![LMAS main window in Landscape mode with the dark theme](docs/images/main_window_landscape_dark.png)](docs/images/main_window_landscape_dark.png)
+
 [![Detailed LMAS view showing LMA sources, labeled stations, GLM event footprints and group centroids, and ENTLN detections](docs/images/main_window_overlays_detail.png)](docs/images/main_window_overlays_detail.png)
 
 *Detailed LMAS view combining LMA sources and labeled stations with GOES-16 GLM event footprints and group centroids, plus ENTLN IC and CG detections.*
-
-[![LMAS main window in Landscape mode with the dark theme](docs/images/main_window_landscape_dark.png)](docs/images/main_window_landscape_dark.png)
 
 ## Highlights
 
