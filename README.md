@@ -6,10 +6,6 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 
 [![LMAS main window in Landscape mode with the dark theme](docs/images/main_window_landscape_dark.png)](docs/images/main_window_landscape_dark.png)
 
-[![Detailed LMAS view showing LMA sources, labeled stations, GLM event footprints and group centroids, and ENTLN detections](docs/images/main_window_overlays_detail.png)](docs/images/main_window_overlays_detail.png)
-
-*Detailed LMAS view combining LMA sources and labeled stations with GOES-16 GLM event footprints and group centroids, plus ENTLN IC and CG detections.*
-
 ## Highlights
 
 - Native readers for solved LMA data and GOES GLM Level 2 LCFA products.
@@ -30,10 +26,6 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 ### Portrait layout and file browser
 
 [![LMAS main window in Portrait mode with the light theme and file browser](docs/images/main_window_portrait_light.png)](docs/images/main_window_portrait_light.png)
-
-### Satellite and network overlays
-
-[![LMAS Satellite Overlays and Network Overlays workspaces](docs/images/network_and_satellite_overlays.png)](docs/images/network_and_satellite_overlays.png)
 
 ## Installation
 

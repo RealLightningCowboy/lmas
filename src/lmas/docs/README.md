@@ -27,10 +27,6 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 
 [![LMAS main window in Portrait mode with the light theme and file browser](docs/images/main_window_portrait_light.png)](docs/images/main_window_portrait_light.png)
 
-### Satellite and network overlays
-
-[![LMAS Satellite Overlays and Network Overlays workspaces](docs/images/network_and_satellite_overlays.png)](docs/images/network_and_satellite_overlays.png)
-
 ## Installation
 
 LMAS is available in two forms:
