@@ -1,4 +1,4 @@
-# Installing LMAS 1.6.0
+# Installing LMAS 1.6.1
 
 LMAS requires Python 3.11 or newer.
 
@@ -15,7 +15,7 @@ The installer installs the bundled wheel and standard GUI dependencies, then cre
 ## Direct wheel installation
 
 ```bash
-python -m pip install ./wheels/lmas-1.6.0-py3-none-any.whl
+python -m pip install ./wheels/lmas-1.6.1-py3-none-any.whl
 ```
 
 The GLM native reader requires `h5py`, which is declared as a required dependency. A Conda or Mamba environment can install it from conda-forge with either solver:
@@ -34,8 +34,8 @@ lma gui
 lma gui --demo
 ```
 
-Expected version: `LMAS 1.6.0`.
+Expected version: `LMAS 1.6.1`.
 
 ## Cartography
 
-LMAS includes compact offline boundary vectors for map underlays. Coast, country, state/province, and United States county lines require no separate map package, internet connection, or first-use download. Cartopy is optional and is not required for the boundary maps included in LMAS 1.6.0.
+LMAS includes compact offline boundary vectors for map underlays. Coast, country, state/province, and United States county lines require no separate map package, internet connection, or first-use download. Cartopy is optional and is not required for the boundary maps included in LMAS 1.6.1.

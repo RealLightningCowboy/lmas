@@ -66,7 +66,7 @@ Use **Options → Keyboard Shortcuts** to inspect or customize bindings, and **H
 
 The main **View options** include **Map underlay**, **True spatial aspect (1 km = 1 km)**, and **Relative time from window start**. Map underlays appear in the plan panel in both Local and Geodetic coordinates. In Local mode LMAS transforms the geographic line geometry into the same kilometer coordinates used by the observations.
 
-Maps require undistorted geometry, so enabling **Map underlay** automatically enables **True spatial aspect**. The True Aspect control remains interactive: turning it off disables the map underlay in the same action. With maps off, True Aspect is optional and off by default. Strict aspect is applied after every preserved redraw and linked navigation commit. Landscape uses one common physical scale across all spatial panels. Portrait preserves 1 km = 1 km in the square plan view while its shallow altitude projections remain linked but aspect-relaxed, so they cannot prevent tight plan-view zooms; the time-altitude panel is never forced into a distance ratio.
+Maps require undistorted geometry, so enabling **Map underlay** automatically enables **True spatial aspect**. The True Aspect control remains interactive: turning it off disables the map underlay in the same action. With maps off, True Aspect is optional and off by default. Strict aspect is applied after every preserved redraw and linked navigation commit. One common physical scale is used across all spatial panels by expanding displayed coordinate limits while preserving the normal panel sizes; the time-altitude panel is not forced into a distance ratio.
 
 Relative time changes only tick labels. Absolute UTC timestamps remain authoritative internally. The origin is the fixed beginning of the windowed record and does not reset when the visible plot is zoomed. Units adapt among microseconds, milliseconds, seconds, minutes, and hours.
 
@@ -190,7 +190,7 @@ Project source references remain backward compatible with the original string-ba
 
 Quality filters remain separate from non-destructive view limits, so reopening a narrowed Project does not discard sources outside the saved view.
 
-LMAS 1.6.0 writes `lmas-project-v1.1` and continues to read v1.0 and supported v0 project formats.
+LMAS 1.6.1 writes `lmas-project-v1.1` and continues to read v1.0 and supported v0 project formats.
 
 ## 11. Portable directories and output behavior
 
@@ -330,4 +330,4 @@ Saved figures reproduce visible group overlay styles, including Recolor, Halo, O
 
 ## 20. Release scope
 
-LMAS 1.6.0 builds on the stable Network Overlays release built on the public Satellite Overlays architecture. The packaged real-data demonstration opens with GLM disabled so users can first inspect the LMA flash and then enable either spacecraft deliberately.
+LMAS 1.6.1 builds on the stable Network Overlays release built on the public Satellite Overlays architecture. The packaged real-data demonstration opens with GLM disabled so users can first inspect the LMA flash and then enable either spacecraft deliberately.

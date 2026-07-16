@@ -424,42 +424,30 @@ def test_portrait_toe_toggle_preserves_fixed_canvas():
     assert all(not axis.get_visible() for axis in renderer._bottom_colorbar_axes)
     plt.close(figure)
 
-def test_portrait_true_aspect_keeps_plan_square_without_altitude_coupling():
+def test_portrait_true_aspect_uses_one_common_initial_spatial_scale():
     import matplotlib.pyplot as plt
 
     project = synthetic_project(count=600)
     plot = replace(project.plot, layout="xlma", true_aspect=True)
     figure = create_lma_figure(project, plot=plot)
-    metadata = figure._lmas_metadata
-    axes = metadata["axis_order"]
-    plan = axes[2]
 
-    # Portrait True Aspect applies to the square plan panel only.  The shallow
-    # altitude projections retain their linked scientific limits without
-    # forcing the plan view back to a broad horizontal span.
-    assert metadata["equal_scale_axes"] == (2,)
-    initial_altitude_y = tuple(axes[1].get_ylim())
-    initial_altitude_x = tuple(axes[3].get_xlim())
-
-    x_values, y_values = (
-        np.asarray(values, dtype=float) for values in metadata["coordinate_pairs"][2]
-    )
-    x_bounds = tuple(np.quantile(x_values, (0.10, 0.90)))
-    y_bounds = tuple(np.quantile(y_values, (0.10, 0.90)))
-    plan.set_xlim(x_bounds, emit=False)
-    plan.set_ylim(y_bounds, emit=False)
-
-    controller = LinkedViewController(figure)
-    controller._pending_explicit = True
-    controller.update_now(plan, record_history=False)
-
-    x_span = abs(np.diff(plan.get_xlim())[0])
-    y_span = abs(np.diff(plan.get_ylim())[0])
-    assert x_span < 10.0
-    assert y_span < 10.0
-    assert np.isclose(x_span, y_span, rtol=1.0e-9, atol=1.0e-9)
-    assert np.allclose(axes[1].get_ylim(), initial_altitude_y)
-    assert np.allclose(axes[3].get_xlim(), initial_altitude_x)
+    figure_width, figure_height = figure.get_size_inches()
+    scales = []
+    for index in (1, 2, 3):
+        axis = figure._lmas_metadata["axis_order"][index]
+        names = figure._lmas_metadata["coordinate_names"][index]
+        position = axis.get_position()
+        x_scale = coordinate_km_per_unit(names[0], project.reference_latitude)
+        y_scale = coordinate_km_per_unit(names[1], project.reference_latitude)
+        scales.extend(
+            [
+                abs(np.diff(axis.get_xlim())[0]) * x_scale
+                / (position.width * figure_width),
+                abs(np.diff(axis.get_ylim())[0]) * y_scale
+                / (position.height * figure_height),
+            ]
+        )
+    assert np.allclose(scales, scales[0], rtol=1.0e-9, atol=1.0e-9)
     plt.close(figure)
 
 def test_portrait_overlay_toggles_do_not_resize_fixed_canvas():

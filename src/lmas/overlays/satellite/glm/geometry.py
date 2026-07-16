@@ -230,6 +230,44 @@ class GLMEventGeometry:
         idx = _normalize_indices(indices, self._center_x_rad.size)
         return np.column_stack((self._center_x_rad[idx], self._center_y_rad[idx]))
 
+    def fixed_grid_centers_to_corners_fixed_grid(
+        self,
+        centers_fixed_grid: np.ndarray,
+        *,
+        inflate: float = 1.0,
+    ) -> np.ndarray:
+        """Return footprint corners for arbitrary fixed-grid pixel centers."""
+        centers = np.asarray(centers_fixed_grid, dtype=np.float64)
+        if centers.size == 0:
+            return np.empty((0, 4, 2), dtype=np.float64)
+        centers = centers.reshape(-1, 2)
+        offsets = _interpolate_corner_offsets(centers[:, 0], centers[:, 1])
+        corners = np.empty_like(offsets)
+        corners[:, :, 0] = centers[:, None, 0] + offsets[:, :, 0] * float(inflate)
+        corners[:, :, 1] = centers[:, None, 1] + offsets[:, :, 1] * float(inflate)
+        return corners
+
+    def fixed_grid_centers_to_corners_lonlat(
+        self,
+        centers_fixed_grid: np.ndarray,
+        *,
+        inflate: float = 1.0,
+    ) -> np.ndarray:
+        """Return geographic footprint corners for arbitrary fixed-grid centers."""
+        fixed = self.fixed_grid_centers_to_corners_fixed_grid(
+            centers_fixed_grid, inflate=inflate
+        )
+        if fixed.size == 0:
+            return np.empty((0, 4, 2), dtype=np.float64)
+        lon, lat = fixed_grid_to_lon_lat(
+            fixed[:, :, 0],
+            fixed[:, :, 1],
+            satellite_longitude_deg=self.satellite_longitude_deg,
+            ellipse_revision=int(self.ellipse_revision),
+            satellite_height_m=self.satellite_height_m,
+        )
+        return np.stack((lon, lat), axis=-1)
+
     def event_corners_fixed_grid(
         self,
         indices: Sequence[int] | np.ndarray | None = None,

@@ -24,6 +24,7 @@ from ...plotting.common import style_colorbar
 from ...plotting.figures import refresh_figure_legend
 from .colormaps import satellite_colormap
 from .manager import SatelliteDatasetRecord, SatelliteOverlayManager
+from .glm.pixels import accumulate_event_pixels
 
 _PLATFORM_COLORS = {
     "east": "chartreuse",
@@ -276,31 +277,22 @@ class SatelliteOverlayRenderer:
         visible_event_idx = all_event_idx[exact_event_keep]
         event_idx = all_event_idx[padded_event_keep]
         visible_events = int(visible_event_idx.size)
+
+        # Accumulate every selected event by fixed-grid detector pixel before
+        # drawing. GLM repeatedly reports the same illuminated pixel in
+        # successive 2 ms groups; Total Optical Energy is the sum across the
+        # complete visible time window, not a stack of overlapping raw events.
+        pixels = accumulate_event_pixels(observation, event_idx)
         limit = 0 if self.for_export else int(style.maximum_interactive_events)
-        truncated = bool(limit and event_idx.size > limit)
+        truncated = bool(limit and len(pixels) > limit)
         if truncated:
-            # Preserve all centered-in-view events whenever the cap permits,
-            # then spend the remaining budget on the highest-energy padded
-            # neighbors. This prevents the edge pad from displacing the
-            # scientific core of the current view.
-            if visible_event_idx.size >= limit:
-                energy = observation.events.energy_j[visible_event_idx]
-                finite_energy = np.nan_to_num(energy, nan=-np.inf)
-                chosen = np.argpartition(finite_energy, -limit)[-limit:]
-                event_idx = visible_event_idx[chosen]
-            else:
-                outside_idx = all_event_idx[padded_event_keep & ~exact_event_keep]
-                remaining = limit - visible_event_idx.size
-                if outside_idx.size > remaining:
-                    energy = observation.events.energy_j[outside_idx]
-                    finite_energy = np.nan_to_num(energy, nan=-np.inf)
-                    chosen = np.argpartition(finite_energy, -remaining)[-remaining:]
-                    outside_idx = outside_idx[chosen]
-                event_idx = np.concatenate((visible_event_idx, outside_idx))
+            finite_energy = np.nan_to_num(pixels.energy_j, nan=-np.inf)
+            chosen = np.argpartition(finite_energy, -limit)[-limit:]
+            pixels = pixels.take(chosen)
         selection_seconds = perf_counter() - selection_started
 
         norm = shared_norm or self._event_norm(
-            observation.events.energy_j[event_idx],
+            pixels.energy_j,
             logarithmic=style.logarithmic_energy,
         )
         cmap = satellite_colormap(style.colormap)
@@ -321,12 +313,14 @@ class SatelliteOverlayRenderer:
         geometry_started = perf_counter()
         polygons = np.empty((0, 4, 2), dtype=float)
         polygon_energy = np.empty(0, dtype=float)
-        if style.show_event_footprints and event_idx.size and norm is not None:
-            polygons_lonlat = observation.geometry.event_corners_lonlat(event_idx)
+        if style.show_event_footprints and len(pixels) and norm is not None:
+            polygons_lonlat = observation.geometry.fixed_grid_centers_to_corners_lonlat(
+                pixels.centers_fixed_grid
+            )
             polygons = self._transform_polygons(polygons_lonlat, x_name=x_name, y_name=y_name)
             polygon_keep = self._polygons_in_plan(polygons, plan)
             polygons = polygons[polygon_keep]
-            polygon_energy = observation.events.energy_j[event_idx][polygon_keep] * 1.0e15
+            polygon_energy = pixels.energy_j[polygon_keep] * 1.0e15
         geometry_seconds = perf_counter() - geometry_started
 
         artist_started = perf_counter()
@@ -828,7 +822,11 @@ class SatelliteOverlayRenderer:
         for record in records:
             selection = record.observation.select(time_range_ns=time_range)
             if selection.event_indices.size:
-                values.append(record.observation.events.energy_j[selection.event_indices])
+                pixels = accumulate_event_pixels(
+                    record.observation, selection.event_indices
+                )
+                if len(pixels):
+                    values.append(pixels.energy_j)
             logarithmic = logarithmic and record.style.logarithmic_energy
         if not values:
             return None

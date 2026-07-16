@@ -1,4 +1,4 @@
-# LMAS 1.6.0 command-line reference
+# LMAS 1.6.1 command-line reference
 
 Run `lma --help` for the installed command tree. The aliases `lmas`, `lma-gui`, and `lmas-gui` are also installed.
 

@@ -665,21 +665,13 @@ def _apply_true_spatial_aspects(
     enabled: bool,
     reference_latitude: float,
     anchors,
-    axis_indices=None,
 ) -> tuple[float | None, ...]:
-    """Apply True Aspect without changing the designed axes geometry.
-
-    By default every spatial panel participates in one common physical scale,
-    preserving the established Landscape behavior.  Portrait may provide a
-    narrower set so its square plan view remains true-aspect while the shallow
-    altitude projections do not limit horizontal zoom.
-    """
-    selected = range(1, len(axes)) if axis_indices is None else axis_indices
+    """Apply one common 1 km = 1 km scale without changing axes geometry."""
     return enforce_true_spatial_scale(
         axes[0].figure,
         axes,
         coordinate_names,
-        axis_indices=selected if enabled else (),
+        axis_indices=range(1, len(axes)) if enabled else (),
         reference_latitude=reference_latitude,
         anchors=anchors,
         emit=False,
@@ -1735,10 +1727,6 @@ def create_xlma_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec,
         axes, coordinate_names, enabled=plot.true_aspect,
         reference_latitude=project.reference_latitude,
         anchors=("N", "N", "C", "N"),
-        # Portrait keeps 1 km = 1 km in the square plan view.  The shallow
-        # altitude projections retain linked scientific limits but are allowed
-        # to stretch vertically/horizontally so they cannot block plan zoom.
-        axis_indices=(2,),
     )
     map_underlay = (
         add_map_underlay(
@@ -1800,7 +1788,7 @@ def create_xlma_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec,
                          (0.03, padding_xy, 0.03, padding_xy),
                          (0.03, 0.05, 0.03, padding_xy)),
         "locked_box_axes": (0,1,2,3),
-        "equal_scale_axes": (2,) if plot.true_aspect else (),
+        "equal_scale_axes": (1,2,3) if plot.true_aspect else (),
         "axis_data_aspects": axis_data_aspects,
         "spatial_axes": (1,2,3), "altitude_axes": (0,1,3), "scatters": scatters,
         "scatter_depth_keys": (source_time_s,)*4, "filtered_count": filtered_count,

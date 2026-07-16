@@ -22,7 +22,10 @@ recursive-include tests *.py
 recursive-include src/lmas/docs *.md
 recursive-include src/lmas/resources *
 recursive-include docs *.md
+recursive-include docs/images *.png
 include src/lmas/resources/G16_corner_lut_fixedgrid.pickle
 
 global-exclude *.py[cod]
 global-exclude __pycache__
+include VALIDATION_SUMMARY.md
+include BUILD_REPORT.md

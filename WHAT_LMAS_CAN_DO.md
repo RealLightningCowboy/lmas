@@ -1,6 +1,6 @@
 # What LMAS can do
 
-LMAS 1.6.0 is an end-to-end environment for already solved Lightning Mapping Array source products and linked observational overlays.
+LMAS 1.6.1 is an end-to-end environment for already solved Lightning Mapping Array source products and linked observational overlays.
 
 ## Data and projects
 
@@ -42,6 +42,6 @@ LMAS 1.6.0 is an end-to-end environment for already solved Lightning Mapping Arr
 ## Geographic context and physical scale
 
 - Draw coastlines, national borders, state/province boundaries, and United States county boundaries in either longitude/latitude or LMAS local kilometers.
-- Enforce strict 1 km = 1 km scale across Landscape spatial panels and the Portrait plan view, while keeping Portrait altitude projections linked without constraining zoom.
+- Enforce strict 1 km = 1 km scale across plan and vertical spatial panels with True Aspect.
 - Require True Aspect automatically whenever map underlays are enabled.
 - Label the time axis in UTC or adaptive elapsed units from the fixed windowed-record start.

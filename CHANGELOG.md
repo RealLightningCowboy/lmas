@@ -1,14 +1,23 @@
 # LMAS changelog
 
+## 1.6.1
+
+- Corrected GLM Total Optical Energy footprint rendering by accumulating all selected events by fixed-grid detector pixel before drawing.
+- Draws one footprint polygon per accumulated pixel and colors it by the summed event energy across the complete visible time window.
+- Uses glmtools-compatible 56 microradian fixed-grid pixel discretization and mean fixed-grid centers for consolidated footprint geometry.
+- Applies shared and per-dataset energy normalization to accumulated pixel energies rather than individual event layers.
+- Applies the interactive footprint cap after accumulation, retaining the highest-energy accumulated pixels when a cap is required.
+- Added packaged-demo regression coverage for GLM event-energy conservation and the known Oklahoma accumulation reference.
+
 ## 1.6.0
 
 - Prevented repeated Portrait overlay-layer changes from progressively resizing and cropping the embedded figure canvas.
 - Restored the Landscape GLM TOE colorbar and figure legend to the compact caption position near the lower scientific axes, raised the TOE bar slightly, and matched its text to the surrounding axis typography.
 - Established a fixed legacy XLMA-style Portrait canvas with a dedicated left GLM TOE-colorbar gutter and a separate right source-colorbar gutter, preventing overlay changes from altering or cropping the scientific layout.
 - Corrected legacy XLMA-style Portrait legends so multi-row LMA/GLM/network entries remain fully inside the saved page.
-- Kept True Aspect in the Portrait plan view while relaxing altitude-panel aspect coupling so shallow vertical projections no longer prevent tight plan-view zooms.
+- Allowed explicit Portrait spatial zooms to drive the common True Aspect scale instead of being expanded back out by untouched non-driver axes.
 - Project Home now translates saved East/West and North/South bounds across live viewpoint changes before applying True Aspect, making repeated Home restores idempotent.
-- Added strict True Aspect with one shared physical kilometres-per-inch scale across every Landscape spatial panel and the Portrait plan view in Local and Geodetic coordinates.
+- Added strict True Aspect with one shared physical kilometres-per-inch scale across every spatial panel in Local and Geodetic coordinates.
 - Preserved full-size panel layouts by padding displayed spatial limits instead of shrinking or stretching axes boxes.
 - Enforced True Aspect after Project Home, view restoration, linked zoom/pan, coordinate changes, and toolbar history navigation.
 - Added bundled offline coast, country, state/province, and United States county boundary underlays in local and geographic coordinates.

@@ -19,9 +19,19 @@ from .geometry import (
     lightning_ellipse_revision,
     lon_lat_to_fixed_grid,
 )
+from .pixels import (
+    GLMAccumulatedPixels,
+    GLM_PIXEL_SCALE_RAD,
+    accumulate_event_pixels,
+    discretize_fixed_grid_pixels,
+)
 from .reader import read_glm, read_glm_l2_lcfa, read_glm_with_glmtools
 
 __all__ = [
+    "GLMAccumulatedPixels",
+    "GLM_PIXEL_SCALE_RAD",
+    "accumulate_event_pixels",
+    "discretize_fixed_grid_pixels",
     "GLMDataError",
     "GLMEventGeometry",
     "GLMDatasetIdentity",

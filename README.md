@@ -1,4 +1,4 @@
-# Lightning Mapping Array Suite (LMAS) 1.6.0
+# Lightning Mapping Array Suite (LMAS) 1.6.1
 
 LMAS is an open-source Python application for interactive, reproducible analysis and presentation of already-solved Lightning Mapping Array data. It combines linked LMA views with analysis tools, GLM overlays, ground-network overlays, Projects and Profiles, publication figures with selectable viewpoints, and live/saved animations.
 
@@ -6,13 +6,17 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 
 [![LMAS main window in Landscape mode with the dark theme](docs/images/main_window_landscape_dark.png)](docs/images/main_window_landscape_dark.png)
 
+[![Detailed LMAS view showing LMA sources, labeled stations, GLM event footprints and group centroids, and ENTLN detections](docs/images/main_window_overlays_detail.png)](docs/images/main_window_overlays_detail.png)
+
+*Detailed LMAS view combining LMA sources and labeled stations with GOES-16 GLM event footprints colored by accumulated Total Optical Energy, GLM group centroids, and ENTLN IC and CG detections.*
+
 ## Highlights
 
 - Native readers for solved LMA data and GOES GLM Level 2 LCFA products.
 - Linked Landscape and Portrait views with coordinated zooming, panning, and filtering.
-- Precision Mode for exact source-to-source measurements. 
+- Precision Mode for exact source-to-source measurements.
 - Linked lasso selection for building and editing reusable source groups.
-- Leader-polarity assignment for Charge Analysis. 
+- Leader-polarity assignment for Charge Analysis.
 - Exportable analysis products.
 - Separate Satellite Overlays and Network Overlays workspaces.
 - GLM footprints, centroids, time rails, legends, and optical-energy colorbars.
@@ -39,13 +43,13 @@ LMAS is available in two forms:
 Download the latest packaged version from the
 [LMAS Releases page](https://github.com/RealLightningCowboy/lmas/releases/latest).
 
-For LMAS 1.6.0, under **Assets**, download:
+For LMAS 1.6.1, under **Assets**, download:
 
-`LMAS_1_6_0.zip`
+`LMAS_1_6_1.zip`
 
 For later releases, download the corresponding versioned LMAS archive.
 
-Extract the archive. LMAS 1.6.0 is validated with Python 3.13, and a dedicated Conda environment is recommended.
+Extract the archive. LMAS 1.6.1 is validated with Python 3.13, and a dedicated Conda environment is recommended.
 
 Create the environment with Mamba:
 
@@ -61,7 +65,7 @@ conda create -n lmas -c conda-forge python=3.13 pip
 conda activate lmas
 ```
 
-Open a terminal in the extracted LMAS directory (`LMAS_1_6_0` for this release) and confirm that the active Python and pip belong to the new environment:
+Open a terminal in the extracted LMAS directory (`LMAS_1_6_1` for this release) and confirm that the active Python and pip belong to the new environment:
 
 ```bash
 python -c "import sys; print(sys.executable)"
