@@ -10,6 +10,12 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 
 *Detailed LMAS view combining LMA sources and labeled stations with GOES-16 GLM event footprints colored by accumulated Total Optical Energy, GLM group centroids, and ENTLN IC and CG detections.*
 
+## Animation
+
+[![LMAS trail-and-afterimage animation](docs/images/lmas_animation_12s.gif)](docs/images/lmas_animation_12s.gif)
+
+*LMAS animation showing the development of Oklahoma lightning flash across linked LMAS views.*
+
 ## Highlights
 
 - Native readers for solved LMA data and GOES GLM Level 2 LCFA products.
