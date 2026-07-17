@@ -14,7 +14,7 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 
 [![LMAS trail-and-afterimage animation](docs/images/lmas_animation_12s.gif)](docs/images/lmas_animation_12s.gif)
 
-*LMAS animation showing the development of Oklahoma lightning flash across linked LMAS views.*
+*LMAS animation showing the development of an Oklahoma lightning flash across linked views.*
 
 ## Highlights
 
