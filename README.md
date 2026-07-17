@@ -54,6 +54,7 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 - Filtering by time, altitude, power, station count, chi-squared, and other source properties.
 - Saved Projects and Profiles that let you pick up where you left off.
 - Scientific data-product exports as NetCDF/xarray datasets and CSV tables, including original LMA fields, source groups, classifications, and provenance.
+- Desktop and application-menu launchers where supported.
 - Command-line interface.
 - Batch workflows.
 
