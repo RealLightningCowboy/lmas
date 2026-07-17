@@ -4,38 +4,49 @@ LMAS is an open-source Python application for interactive, reproducible analysis
 
 LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/xlma-python), including its `pyxlma` package, and [glmtools](https://github.com/deeplycloudy/glmtools), developed by Eric Bruning and collaborators. LMAS’s native readers and portions of its plotting and GLM geometry implementation derive from those projects. LMAS adds an integrated desktop application, linked analysis workflows, Projects and Profiles, overlay management, and scientific exports.
 
+## Gallery
+
 [![LMAS main window in Landscape mode with the dark theme](docs/images/main_window_landscape_dark.png)](docs/images/main_window_landscape_dark.png)
+
+*Main window of LMAS displaying an Oklahoma lightning flash across linked views.*
 
 [![Detailed LMAS view showing LMA sources, labeled stations, GLM event footprints and group centroids, and ENTLN detections](docs/images/main_window_overlays_detail.png)](docs/images/main_window_overlays_detail.png)
 
 *Detailed LMAS view combining LMA sources and labeled stations with GOES-16 GLM event footprints colored by accumulated Total Optical Energy, GLM group centroids, and ENTLN IC and CG detections.*
 
-## Animation
+### Animation
 
-[![LMAS trail-and-afterimage animation](docs/images/lmas_animation_12s.gif)](docs/images/lmas_animation_12s.gif)
+[![Animation of an Oklahoma lightning flash developing across linked LMAS views](docs/images/lmas_animation_12s.gif)](docs/images/lmas_animation_12s.gif)
 
-*LMAS animation showing the development of an Oklahoma lightning flash across linked views.*
-
-## Highlights
-
-- Native readers for solved LMA data and GOES GLM Level 2 LCFA products.
-- Linked Landscape and Portrait views with coordinated zooming, panning, and filtering.
-- Precision Mode for exact source-to-source measurements.
-- Linked lasso selection for building and editing reusable source groups.
-- Leader-polarity assignment for Charge Analysis.
-- Exportable analysis products.
-- Separate Satellite Overlays and Network Overlays workspaces.
-- GLM footprints, centroids, time rails, legends, and optical-energy colorbars.
-- Ground-network detections with IC/CG styling, peak-current scaling, uncertainty ellipses, and time rails.
-- Publication-ready figures, animations, Projects, Profiles, batch workflows, and command-line tools.
-- Light and dark themes.
-- Offline coastline, country, state/province, and county boundaries.
-
-## Interface examples
+*Animation of an Oklahoma lightning flash’s development across linked LMAS views. Both interactive and saved animations are supported.*
 
 ### Portrait layout and file browser
 
 [![LMAS main window in Portrait mode with the light theme and file browser](docs/images/main_window_portrait_light.png)](docs/images/main_window_portrait_light.png)
+
+*An XLMA-style portrait layout, light theme, and integrated file browser are optionally available.*
+
+## Features
+
+- Data readers:
+    - Native readers for solved LMA data and GOES GLM Level 2 LCFA products.
+    - Compatibility with xlma-python and glmtools readers.
+- Visualization:
+    - Linked Landscape and Portrait views with coordinated zooming, panning, and filtering.
+    - Flexible **Color by** controls for time, source power, polarity, source groups, and other source variables.
+    - Publication-quality figures with selectable viewpoints.
+    - Interactive and saved animations.
+- Dedicated workspaces:
+    - **Precision Mode** — exact source-to-source measurements.
+    - **Source Selection** — linked lasso and point selection for building, editing, and reusing LMA source groups.
+    - **Charge Analysis** — assign polarity to source groups and export analysis products.
+    - **Satellite Overlays** — GLM event footprints, group centroids, time rails, legends, and Total Optical Energy color mapping.
+    - **Network Overlays** — ground-network detections with IC/CG styling, peak-current scaling, uncertainty ellipses, and time rails.
+- Saved Projects and Profiles that let you pick up where you left off.
+- Command-line interface.
+- Batch workflows.
+- Light and dark themes.
+- Offline coastline, country, state/province, and county boundary maps.
 
 ## Installation
 
@@ -55,7 +66,7 @@ For LMAS 1.6.1, under **Assets**, download:
 
 For later releases, download the corresponding versioned LMAS archive.
 
-Extract the archive. LMAS 1.6.1 is validated with Python 3.13, and a dedicated Conda environment is recommended.
+Extract the archive. LMAS 1.6.1 has been validated on Python 3.13, and a dedicated Conda environment is recommended.
 
 Create the environment with Mamba:
 
@@ -98,9 +109,9 @@ Open the included demonstration with:
 lma gui --demo
 ```
 
-### From source
+### Install from source
 
-Developers may clone the repository and install LMAS directly from the source tree:
+Developers may wish to clone the repository and install LMAS directly from the source tree:
 
 ```bash
 git clone https://github.com/RealLightningCowboy/lmas.git
@@ -145,6 +156,6 @@ The included one-minute Oklahoma case contains LMA data and GOES-16/GOES-17 GLM 
 
 ## License and attribution
 
-Original LMAS code and documentation are distributed under the MIT License in `LICENSE`, copyright R. Stetson Reger. Upstream and bundled materials retain their own notices in `licenses/`; `licenses/README.md` explains which terms apply to each component.
+Original LMAS code and documentation are distributed under the MIT License in `LICENSE`, with copyright held by R. Stetson Reger. Upstream and bundled materials retain their own notices in `licenses/`; `licenses/README.md` explains which terms apply to each component.
 
 See `CREDITS.md`, `DEVELOPMENT_PROVENANCE.md`, `LINEAGE_AND_ATTRIBUTION.md`, and `THIRD_PARTY_NOTICES.md` for fuller attribution and provenance.
