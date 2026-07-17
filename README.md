@@ -30,23 +30,32 @@ LMAS builds on the foundations of [xlma-python](https://github.com/deeplycloudy/
 
 - Data readers:
     - Native readers for solved LMA data and GOES GLM Level 2 LCFA products.
-    - Compatibility with xlma-python and glmtools readers.
+    - Compatibility with `xlma-python` and `glmtools` readers.
+- Data and array inspection:
+    - Integrated file browser.
+    - Searchable viewer for LMA file headers and metadata.
+    - **Array Info** for inspecting the loaded LMA array, station locations, and available station metadata.
 - Visualization:
     - Linked Landscape and Portrait views with coordinated zooming, panning, and filtering.
-    - Flexible **Color by** controls for time, source power, polarity, source groups, and other source variables.
-    - Publication-quality figures with selectable viewpoints.
+    - Local Cartesian and geographic coordinate views.
+    - Selectable viewpoints.
+    - Flexible **Color by** controls for time, source power, charge polarity, source groups, and other source variables.
+    - Publication-quality figures.
     - Interactive and saved animations.
+    - Optional interactive 3D visualization.
+    - Light and dark themes.
+    - Offline coastline, country, state/province, and county boundary maps.
 - Dedicated workspaces:
     - **Precision Mode** — exact source-to-source measurements.
     - **Source Selection** — linked lasso and point selection for building, editing, and reusing LMA source groups.
     - **Charge Analysis** — assign polarity to source groups and export analysis products.
     - **Satellite Overlays** — GLM event footprints, group centroids, time rails, legends, and Total Optical Energy color mapping.
     - **Network Overlays** — ground-network detections with IC/CG styling, peak-current scaling, uncertainty ellipses, and time rails.
+- Filtering by time, altitude, power, station count, chi-squared, and other source properties.
 - Saved Projects and Profiles that let you pick up where you left off.
+- Scientific data-product exports as NetCDF/xarray datasets and CSV tables, including original LMA fields, source groups, classifications, and provenance.
 - Command-line interface.
 - Batch workflows.
-- Light and dark themes.
-- Offline coastline, country, state/province, and county boundary maps.
 
 ## Installation
 
