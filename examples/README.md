@@ -1,4 +1,4 @@
-# LMAS 1.6.2 examples
+# LMAS 1.6.3 examples
 
 - **File → Open demonstration** or `lma gui --demo` opens the packaged real-data
   2019-04-30 Oklahoma LMA + GOES-16/GOES-17 GLM hybrid flash.

@@ -1,31 +1,17 @@
-# LMAS 1.6.2 release notes
+# LMAS 1.6.3 release notes
 
-LMAS 1.6.2 is a responsiveness and interaction release for the stable 1.6 line. It carries the proven performance work from the later development builds into the published 1.6 feature set, without adding new scientific workspaces or changing established Project and product formats.
+LMAS 1.6.3 is a small corrective update for the stable 1.6 line. It begins with the published 1.6.2 source and preserves that release's responsiveness work and public feature set.
 
-## Main-window responsiveness
+## Corrected Project and source switching
 
-- The Qt canvas and Matplotlib toolbar are retained across ordinary redraws instead of being destroyed and recreated.
-- Cosmetic controls update existing artists in place when the figure structure does not need to change.
-- Plot-ready NumPy arrays and repeated scientific selections are cached against the loaded source store.
-- Linked-view controllers and callbacks are disconnected cleanly when a structural redraw is required.
+LMAS retains the Qt canvas and Matplotlib toolbar for responsiveness. When a different Project or source file was opened in the same session, the newly attached Matplotlib figure could keep its smaller constructor dimensions because Qt had no reason to issue another widget resize event. LMAS now explicitly synchronizes the replacement figure, renderer, DPI, and resize callbacks to the existing canvas before drawing. The new plot therefore fills the current canvas immediately.
 
-## Faster panning
+## Projection-animation source time
 
-While the mouse is held down, LMAS temporarily displays a stable 1,500-source proxy and renders only the moving scientific panel at a bounded update rate. Releasing the mouse restores the configured preview population, applies the exact final limits, updates linked scientific membership once, and performs one complete redraw.
-
-## Interactive animation
-
-- **View proj.** opens inside the running LMAS application and reuses the already-loaded Project and source data.
-- Interactive projection and 3D viewers use time-stratified point limits while saved animations remain uncapped.
-- Projection frames use pre-sorted source times, binary-search slices, reusable buffers, elapsed-time playback, missed-frame skipping, throttled timeline scrubbing, and Matplotlib blitting.
-- The Space bar controls projection Play/Pause immediately after the viewer opens.
-- Projection and 3D animations begin at the exact start of the selected time window, even when the first frames contain no sources.
-- 3D shutdown handling is more defensive when a native VTK window closes or the graphics backend fails.
-
-## Startup
-
-LMAS now shows a small startup window before importing the full GUI stack. Initial Project or data loading begins after the Qt event loop starts, and optional readers, overlays, dialogs, product exporters, plotting helpers, and analysis tools are imported only when needed.
+- The live **View proj.** source time is displayed in the control row below the figure rather than as a second figure-title line.
+- Saved projection animations retain source time in a compact dedicated header above the top science axes.
+- The main title remains one line, preventing overlap with the altitude-versus-time panel on shorter laptop displays.
 
 ## Scope
 
-The release preserves 1.6 scientific filtering, source selection, charge analysis, overlays, saved figures, saved animations, data products, Project/Profile compatibility, and command-line workflows. The performance changes affect interactive preparation and rendering; exact exports remain based on the complete selected source population.
+The release retains all LMAS 1.6.2 startup, panning, redraw, interactive animation, and 3D responsiveness improvements. It adds no new scientific workspace and does not change Project or product formats.

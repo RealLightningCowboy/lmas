@@ -9,17 +9,41 @@ from matplotlib.backend_bases import NavigationToolbar2
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
 from PySide6.QtCore import QTimer, Qt, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QResizeEvent
 from PySide6.QtWidgets import QFileDialog, QMainWindow, QSizePolicy, QVBoxLayout, QWidget
 
 from ..interactions import LinkedViewController
 from ..plotting import save_figure
 
 
+
+class LMASFigureCanvas(FigureCanvasQTAgg):
+    """Qt canvas with an explicit replacement-figure resize helper."""
+
+    def sync_figure_size_to_widget(self) -> bool:
+        """Resize the attached Figure to the canvas's current pixel geometry.
+
+        Reusing the Qt canvas avoids expensive widget reconstruction, but Qt
+        does not emit a resize event when only ``canvas.figure`` changes. A
+        replacement Figure would otherwise retain its constructor dimensions
+        and occupy only part of the existing canvas until the window changes
+        size. Replaying the backend resize path synchronizes the new Figure,
+        renderer, DPI, and Matplotlib resize callbacks immediately.
+        """
+
+        if self.figure is None:
+            return False
+        size = self.size()
+        if size.width() <= 1 or size.height() <= 1:
+            return False
+        self.resizeEvent(QResizeEvent(size, size))
+        return True
+
+
 class _CanvasHolder(QWidget):
     """Host a Matplotlib canvas, optionally preserving a fixed aspect ratio."""
 
-    def __init__(self, canvas: FigureCanvasQTAgg, aspect_ratio: float | None, parent: QWidget | None = None) -> None:
+    def __init__(self, canvas: LMASFigureCanvas, aspect_ratio: float | None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._canvas = canvas
         self._aspect_ratio = float(aspect_ratio) if aspect_ratio and aspect_ratio > 0 else None
@@ -291,7 +315,7 @@ class FigureHost(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._figure: Figure | None = None
-        self._canvas: FigureCanvasQTAgg | None = None
+        self._canvas: LMASFigureCanvas | None = None
         self._toolbar: NavigationToolbar2QT | None = None
         self._canvas_holder: _CanvasHolder | None = None
         self._linked_view: LinkedViewController | None = None
@@ -335,7 +359,7 @@ class FigureHost(QWidget):
 
         aspect_ratio = self._figure_aspect_ratio(figure)
         if self._canvas is None:
-            self._canvas = FigureCanvasQTAgg(figure)
+            self._canvas = LMASFigureCanvas(figure)
             self._canvas.setSizePolicy(
                 QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
             )
@@ -372,6 +396,10 @@ class FigureHost(QWidget):
             if self._canvas_holder is not None:
                 self._canvas_holder.rebind_draw_callback()
                 self._canvas_holder.set_aspect_ratio(aspect_ratio)
+            # The Qt widget itself was reused, so replacing only its Matplotlib
+            # Figure does not generate a resize event. Replay that backend path
+            # now so the new plot fills the current canvas immediately.
+            self._canvas.sync_figure_size_to_widget()
 
         self._figure = figure
         self._linked_view = LinkedViewController(

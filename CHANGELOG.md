@@ -1,5 +1,12 @@
 # LMAS changelog
 
+## 1.6.3
+
+- Corrected in-session Project and source-file switching so replacement figures immediately fill the reused Qt canvas instead of retaining their smaller constructor dimensions.
+- Kept live projection-animation source time in the control row, preventing it from overlapping the altitude-versus-time axes on shorter laptop displays.
+- Added a compact, dedicated source-time header for saved projection animations.
+- Preserved the 1.6.2 responsiveness improvements, established 1.6 feature set, Project formats, scientific filtering, and exact saved products.
+
 ## 1.6.2
 
 - Backported the proven LMAS responsiveness work to the stable 1.6 release line without changing its public analysis feature set.

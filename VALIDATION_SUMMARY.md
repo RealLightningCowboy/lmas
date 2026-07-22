@@ -1,19 +1,18 @@
-# LMAS 1.6.2 validation summary
+# LMAS 1.6.3 validation summary
 
-LMAS 1.6.2 is a stable-line responsiveness release based on the published 1.6.1 source.
+LMAS 1.6.3 is a stable-line corrective release based on LMAS 1.6.2.
 
 ## Required checks
 
-- Package identity reports `1.6.2`.
-- The complete 124-test source suite passes.
-- Main-window redraws retain the Qt canvas and cleanly replace linked controllers.
-- Fast pan uses a bounded temporary source proxy and restores the normal population on release.
-- Interactive projection animation reuses the loaded Project and applies an interactive point budget.
-- Interactive playback uses selected-window timing, including empty frames before the first source.
-- Projection Play/Pause is available from the Space bar immediately after opening.
-- Saved projection and 3D products remain uncapped.
+- Package identity reports `1.6.3`.
+- The complete 128-test source suite passes.
+- Replacement figures synchronize with the existing canvas size before display.
+- Repeated Project and source-file switches retain the canvas and do not progressively shrink the plot.
+- Interactive projection source time appears in the control row rather than the figure title.
+- Saved projection source time remains embedded in a dedicated compact header clear of the top axes.
+- Existing 1.6.2 responsiveness behavior and uncapped saved products remain intact.
 - The root README passes the exact version-only transformation guard.
-- Built source and release archives pass the prohibited-feature text and file audit.
-- Wheel metadata, entry points, `RECORD` hashes, installation, and archive integrity are verified.
+- Built artifacts pass the excluded-feature text and filename audit.
+- Wheel metadata, installation, `RECORD` hashes, internal checksums, and archive integrity are verified.
 
-Live Qt and VTK behavior remains the final acceptance test on supported user hardware.
+Live repeated file switching and Qt/VTK interaction remain the final acceptance tests on supported user hardware.

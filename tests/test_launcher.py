@@ -31,7 +31,7 @@ def test_macos_launcher_bundle(tmp_path, monkeypatch):
     assert info["CFBundleIdentifier"] == "org.langmuir.lmas"
     assert info["CFBundleExecutable"] == "LMAS"
     assert info["CFBundleDisplayName"] == "Lightning Mapping Array Suite"
-    assert info["CFBundleShortVersionString"] == "1.6.2"
+    assert info["CFBundleShortVersionString"] == "1.6.3"
     assert (tmp_path / "Desktop" / "Lightning Mapping Array Suite.app").is_symlink()
 
 

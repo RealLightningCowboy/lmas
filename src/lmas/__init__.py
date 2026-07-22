@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 __all__ = ["FilterSpec", "LMAProject", "LmaSourceStore", "PlotSpec"]
-__version__ = "1.6.2"
+__version__ = "1.6.3"
 
 if TYPE_CHECKING:
     from .model import FilterSpec, LMAProject, PlotSpec

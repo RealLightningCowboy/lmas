@@ -3,7 +3,7 @@ from lmas.model import PlotSpec
 
 
 def test_release_version():
-    assert __version__ == "1.6.2"
+    assert __version__ == "1.6.3"
 
 
 def test_public_plot_defaults():

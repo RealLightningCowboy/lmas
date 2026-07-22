@@ -190,7 +190,7 @@ Project source references remain backward compatible with the original string-ba
 
 Quality filters remain separate from non-destructive view limits, so reopening a narrowed Project does not discard sources outside the saved view.
 
-LMAS 1.6.2 writes `lmas-project-v1.1` and continues to read v1.0 and supported v0 project formats.
+LMAS 1.6.3 writes `lmas-project-v1.1` and continues to read v1.0 and supported v0 project formats.
 
 ## 11. Portable directories and output behavior
 
@@ -221,7 +221,7 @@ Portrait figures use a fixed **8.55 × 11 inch** page when the ordinary source c
 - Trail;
 - Trail + afterimage.
 
-Interactive playback supports pause, restart, timeline scrubbing, looping, and live display-mode changes. Press **Space** immediately after the viewer opens to toggle Play/Pause. Playback begins at the exact start of the selected time window, so the opening frames can be empty when the first source occurs later. Saved animations include FPS, duration, final hold, resolution, and video-quality controls. Batch projection export can combine themes and display modes while preserving one committed subset.
+Interactive playback supports pause, restart, timeline scrubbing, looping, and live display-mode changes. Press **Space** immediately after the viewer opens to toggle Play/Pause. Playback begins at the exact start of the selected time window, so the opening frames can be empty when the first source occurs later. Saved animations include FPS, duration, final hold, resolution, and video-quality controls. Live source time appears in the viewer control row; saved projection animations place it in a compact header above the top science axes. Batch projection export can combine themes and display modes while preserving one committed subset.
 
 ## 14. Three-dimensional visualization
 
@@ -330,4 +330,4 @@ Saved figures reproduce visible group overlay styles, including Recolor, Halo, O
 
 ## 20. Release scope
 
-LMAS 1.6.2 builds on the stable Network Overlays release built on the public Satellite Overlays architecture. The packaged real-data demonstration opens with GLM disabled so users can first inspect the LMA flash and then enable either spacecraft deliberately.
+LMAS 1.6.3 builds on the stable Network Overlays release built on the public Satellite Overlays architecture. The packaged real-data demonstration opens with GLM disabled so users can first inspect the LMA flash and then enable either spacecraft deliberately.

@@ -84,6 +84,58 @@ def _apply_saved_view(figure, project: LMAProject) -> None:
         callback()
 
 
+
+def _install_animation_header(figure, metadata: dict, title_artist):
+    """Create a compact source-time line that stays clear of the top axes.
+
+    Projection playback previously appended source time as a second suptitle
+    line. On short laptop canvases that line extended into the altitude-versus-
+    time axes. Keep the main title to one line and anchor a smaller time label
+    immediately above the highest science axes instead.
+    """
+
+    if title_artist is not None:
+        try:
+            title_artist.set_y(0.992)
+            title_artist.set_va("top")
+            title_artist.set_linespacing(1.0)
+        except Exception:
+            pass
+
+    axes = dict(metadata.get("axes", {}))
+    top = 0.915
+    positions = []
+    for axis in axes.values():
+        try:
+            positions.append(float(axis.get_position().y1))
+        except Exception:
+            continue
+    if positions:
+        top = max(positions)
+
+    time_y = min(0.965, top + 0.006)
+    title_size = 15.0
+    title_color = None
+    if title_artist is not None:
+        try:
+            title_size = float(title_artist.get_fontsize())
+        except Exception:
+            pass
+        try:
+            title_color = title_artist.get_color()
+        except Exception:
+            pass
+    kwargs = {
+        "ha": "center",
+        "va": "bottom",
+        "fontsize": max(8.0, title_size - 5.0),
+        "zorder": 20,
+    }
+    if title_color is not None:
+        kwargs["color"] = title_color
+    return figure.text(0.5, time_y, "", **kwargs)
+
+
 @dataclass
 class ProjectionAnimationScene:
     figure: object
@@ -102,6 +154,7 @@ class ProjectionAnimationScene:
     animation_start_ms: float
     animation_end_ms: float
     preserve_depth_order: bool = True
+    time_artist: object | None = None
     _offsets: list[np.ndarray] = field(default_factory=list, init=False, repr=False)
     _depth_orders: list[np.ndarray | None] = field(
         default_factory=list, init=False, repr=False
@@ -181,6 +234,8 @@ class ProjectionAnimationScene:
         artists = list(self.scatters)
         if self.title_artist is not None:
             artists.append(self.title_artist)
+        if self.time_artist is not None:
+            artists.append(self.time_artist)
         return tuple(artists)
 
     def _visible_bounds(
@@ -271,9 +326,12 @@ class ProjectionAnimationScene:
             else:
                 population = f"{visible_count:,} visible of {total:,} sources in view"
             self.title_artist.set_text(
-                f"{self.base_title} — {population}{self.chi2_suffix}\n"
-                f"Source time: {float(current_time_ms):.3f} ms"
+                f"{self.base_title} — {population}{self.chi2_suffix}"
             )
+            if self.time_artist is not None:
+                self.time_artist.set_text(
+                    f"Source time: {float(current_time_ms):.3f} ms"
+                )
         return visible_count
 
     def close(self) -> None:
@@ -473,6 +531,14 @@ def build_projection_animation_scene(
     for scatter in scatters:
         scatter.set_array(None)
     title_artist = metadata.get("title_artist")
+    # Interactive source time is displayed in the viewer control row. Saved
+    # animations retain an embedded source-time label in a dedicated compact
+    # header that stays clear of the top axes on short displays.
+    time_artist = (
+        None
+        if interactive
+        else _install_animation_header(figure, metadata, title_artist)
+    )
     base_title = str(custom_title or plot.title or project.data_source_stem)
     chi2_suffix = (
         f" (χ² < {project.filters.maximum_chi2:.2f})"
@@ -489,6 +555,7 @@ def build_projection_animation_scene(
         time_ms=time_ms,
         base_rgba=base_rgba,
         title_artist=title_artist,
+        time_artist=time_artist,
         base_title=base_title,
         chi2_suffix=chi2_suffix,
         cmap=plot.cmap if plot.color_by == "time" else None,

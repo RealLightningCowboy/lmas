@@ -40,7 +40,7 @@ def _project() -> LMAProject:
         }
     )
     dataset["event_altitude"].attrs["units"] = "m"
-    return LMAProject(dataset=dataset, name="1.6.2 timing test")
+    return LMAProject(dataset=dataset, name="1.6.3 timing test")
 
 
 def test_explicit_animation_window_precedes_first_source() -> None:

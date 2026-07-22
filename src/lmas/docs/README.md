@@ -1,4 +1,4 @@
-# Lightning Mapping Array Suite (LMAS) 1.6.2
+# Lightning Mapping Array Suite (LMAS) 1.6.3
 
 LMAS is an open-source Python application for interactive, reproducible analysis and presentation of already-solved Lightning Mapping Array data. It combines linked LMA views with analysis tools, GLM overlays, ground-network overlays, Projects and Profiles, publication figures with selectable viewpoints, and live/saved animations.
 
@@ -31,13 +31,13 @@ LMAS is available in two forms:
 Download the latest packaged version from the
 [LMAS Releases page](https://github.com/RealLightningCowboy/lmas/releases/latest).
 
-For LMAS 1.6.2, under **Assets**, download:
+For LMAS 1.6.3, under **Assets**, download:
 
-`LMAS_1_6_2.zip`
+`LMAS_1_6_3.zip`
 
 For later releases, download the corresponding versioned LMAS archive.
 
-Extract the archive. LMAS 1.6.2 is validated with Python 3.13, and a dedicated Conda environment is recommended.
+Extract the archive. LMAS 1.6.3 is validated with Python 3.13, and a dedicated Conda environment is recommended.
 
 Create the environment with Mamba:
 
@@ -53,7 +53,7 @@ conda create -n lmas -c conda-forge python=3.13 pip
 conda activate lmas
 ```
 
-Open a terminal in the extracted LMAS directory (`LMAS_1_6_2` for this release) and confirm that the active Python and pip belong to the new environment:
+Open a terminal in the extracted LMAS directory (`LMAS_1_6_3` for this release) and confirm that the active Python and pip belong to the new environment:
 
 ```bash
 python -c "import sys; print(sys.executable)"

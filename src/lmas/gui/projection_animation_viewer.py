@@ -316,7 +316,9 @@ class ProjectionAnimationViewer(QMainWindow):
             population = f"{visible:,}/{displayed:,} visible · {total:,} total"
         else:
             population = f"{visible:,}/{total:,} visible"
-        self.time_label.setText(f"{current:.3f} ms · {population}")
+        self.time_label.setText(
+            f"Source time: {current:.3f} ms · {population}"
+        )
 
         if self._blit_background is None:
             self._recache_blit()
