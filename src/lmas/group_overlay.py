@@ -217,7 +217,7 @@ def apply_saved_source_group_overlays(figure, selection_state: Mapping[str, Any]
         for raw in (state.get("groups") or ())
     ]
     active_domain = str(state.get("active_domain") or "").strip().lower()
-    if active_domain not in {"custom", "charge", "leader"}:
+    if active_domain not in {"custom", "charge"}:
         active_group = next((item for item in groups if item.name == active_name), None)
         active_domain = active_group.domain if active_group is not None else "custom"
     # Match the live renderer: the active group is composed last so overlap

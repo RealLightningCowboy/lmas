@@ -190,7 +190,7 @@ Project source references remain backward compatible with the original string-ba
 
 Quality filters remain separate from non-destructive view limits, so reopening a narrowed Project does not discard sources outside the saved view.
 
-LMAS 1.6.1 writes `lmas-project-v1.1` and continues to read v1.0 and supported v0 project formats.
+LMAS 1.6.2 writes `lmas-project-v1.1` and continues to read v1.0 and supported v0 project formats.
 
 ## 11. Portable directories and output behavior
 
@@ -221,11 +221,11 @@ Portrait figures use a fixed **8.55 × 11 inch** page when the ordinary source c
 - Trail;
 - Trail + afterimage.
 
-Interactive playback supports pause, restart, timeline scrubbing, looping, and live display-mode changes. Saved animations include FPS, duration, final hold, resolution, and video-quality controls. Batch projection export can combine themes and display modes while preserving one committed subset.
+Interactive playback supports pause, restart, timeline scrubbing, looping, and live display-mode changes. Press **Space** immediately after the viewer opens to toggle Play/Pause. Playback begins at the exact start of the selected time window, so the opening frames can be empty when the first source occurs later. Saved animations include FPS, duration, final hold, resolution, and video-quality controls. Batch projection export can combine themes and display modes while preserving one committed subset.
 
 ## 14. Three-dimensional visualization
 
-**View 3D** and **Save 3D** use the exact current linked source subset. PyVista and VTK are optional dependencies.
+**View 3D** and **Save 3D** use the exact current linked source subset. Interactive 3D playback begins at the selected time-window boundary; **Space** or **P** toggles Play/Pause. PyVista and VTK are optional dependencies.
 
 The 3D base-grid control draws only the horizontal base grid and N/S/E/W labels. Vertical walls, cube edges, and altitude ladders are intentionally omitted so they cannot obscure the flash during an orbit.
 
@@ -316,12 +316,12 @@ The same interfaces are available from Python as `project.polarity_dataframe()` 
 
 ## 19. Source Selection application tabs
 
-The **Source Selection** window contains three application tabs backed by one stable source-ID membership engine:
+The **Source Selection** window contains two application tabs backed by one stable source-ID membership engine:
 
 - **Custom Selection** — arbitrary reusable scientific or quality-control groups;
 - **Charge Analysis** — Unassigned, Positive, and Negative polarity-oriented groups;
 
-Groups remain in separate lists but may contain the same source IDs. Copy/promotion tools preserve the original group and create an exact cross-domain membership copy. Charge-overlap summaries make polarity correspondence visible for an active leader group.
+Groups remain in separate lists but may contain the same source IDs. Copy/promotion tools preserve the original group and create an exact cross-domain membership copy. Charge-overlap summaries make polarity correspondence visible for the active group.
 
 The **Default tool action** applies to both lasso and point editing. Add, Replace, Remove, and Intersect use the active group in the active tab. Removal edits can target assigned sources that no longer pass the current filters but remain visible through a group overlay.
 
@@ -330,4 +330,4 @@ Saved figures reproduce visible group overlay styles, including Recolor, Halo, O
 
 ## 20. Release scope
 
-LMAS 1.6.1 builds on the stable Network Overlays release built on the public Satellite Overlays architecture. The packaged real-data demonstration opens with GLM disabled so users can first inspect the LMA flash and then enable either spacecraft deliberately.
+LMAS 1.6.2 builds on the stable Network Overlays release built on the public Satellite Overlays architecture. The packaged real-data demonstration opens with GLM disabled so users can first inspect the LMA flash and then enable either spacecraft deliberately.

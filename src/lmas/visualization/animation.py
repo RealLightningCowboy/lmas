@@ -52,6 +52,43 @@ def afterimage_grayscale_values(
     return shadow, values
 
 
+def animation_window_bounds_utc(
+    source_times_utc: Iterable[np.datetime64] | np.ndarray,
+    *,
+    start_time: str | np.datetime64 | None = None,
+    end_time: str | np.datetime64 | None = None,
+) -> tuple[np.datetime64, np.datetime64]:
+    """Resolve the requested animation window around a finite source population.
+
+    Explicit bounds are retained even when the first or final source occurs
+    inside the window. Missing bounds fall back to the first or final finite
+    source time. This lets interactive and saved 2D/3D animations begin at the
+    selected window boundary instead of silently trimming leading empty time.
+    """
+
+    values = np.asarray(source_times_utc).astype("datetime64[ns]")
+    finite = values[~np.isnat(values)]
+    if finite.size == 0:
+        raise ConfigurationError("Animation time bounds require finite source times")
+
+    def resolve(value, fallback: np.datetime64, label: str) -> np.datetime64:
+        if value in (None, ""):
+            return fallback
+        try:
+            result = np.datetime64(value, "ns")
+        except (TypeError, ValueError) as exc:
+            raise ConfigurationError(f"Invalid animation {label} time: {value!r}") from exc
+        if np.isnat(result):
+            raise ConfigurationError(f"Invalid animation {label} time: {value!r}")
+        return result
+
+    start = resolve(start_time, finite.min(), "start")
+    end = resolve(end_time, finite.max(), "end")
+    if end < start:
+        raise ConfigurationError("Animation window end must not precede its start")
+    return start, end
+
+
 def animation_frame_times(
     start_ms: float,
     end_ms: float,

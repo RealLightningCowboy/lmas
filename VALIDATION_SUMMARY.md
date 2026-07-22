@@ -1,16 +1,19 @@
-# LMAS 1.6.1 validation summary
+# LMAS 1.6.2 validation summary
 
-LMAS 1.6.1 is a focused corrective release for GLM event-footprint Total Optical Energy rendering.
+LMAS 1.6.2 is a stable-line responsiveness release based on the published 1.6.1 source.
 
 ## Required checks
 
-- Package identity reports `1.6.1`.
-- GLM events are consolidated by 56 microradian fixed-grid pixel before drawing.
-- Event energy is summed across the selected time window.
-- One polygon is generated per accumulated pixel.
-- Shared and per-dataset color normalization use accumulated energies.
-- Packaged Oklahoma GOES-16 reference: 495 selected events, 74 accumulated pixels, maximum 68 events in one pixel, maximum accumulated energy approximately 1960.8714 fJ.
-- Accumulated energy equals selected raw-event energy within floating-point tolerance.
-- Corrected interactive rendering visually matches the established glmtools reference pattern.
+- Package identity reports `1.6.2`.
+- The complete 124-test source suite passes.
+- Main-window redraws retain the Qt canvas and cleanly replace linked controllers.
+- Fast pan uses a bounded temporary source proxy and restores the normal population on release.
+- Interactive projection animation reuses the loaded Project and applies an interactive point budget.
+- Interactive playback uses selected-window timing, including empty frames before the first source.
+- Projection Play/Pause is available from the Space bar immediately after opening.
+- Saved projection and 3D products remain uncapped.
+- The root README passes the exact version-only transformation guard.
+- Built source and release archives pass the prohibited-feature text and file audit.
+- Wheel metadata, entry points, `RECORD` hashes, installation, and archive integrity are verified.
 
-The build report records the exact automated test and artifact checks completed for the packaged release.
+Live Qt and VTK behavior remains the final acceptance test on supported user hardware.

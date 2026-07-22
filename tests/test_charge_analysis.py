@@ -46,7 +46,7 @@ def test_manager_round_trip_preserves_charge_provenance_and_style():
     assert group.color == CHARGE_COLORS["negative"]
     assert group.created_utc
     assert group.modified_utc
-    assert group.created_with_lmas_version == "1.6.1"
+    assert group.created_with_lmas_version == "1.6.2"
 
 
 def test_overlap_reporting_can_focus_on_assigned_groups():

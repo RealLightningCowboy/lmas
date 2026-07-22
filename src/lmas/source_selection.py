@@ -15,7 +15,6 @@ from typing import Any, Iterable, Literal, Mapping, Sequence
 
 import numpy as np
 from matplotlib.path import Path as MplPath
-from scipy.spatial import ConvexHull, Delaunay, QhullError, cKDTree
 
 from . import __version__
 
@@ -350,8 +349,6 @@ def _normalized_domain(value: str | None, *, charge_category: str | None = None)
         "selection": "custom",
         "source_selection": "custom",
         "polarity": "charge",
-        "leader_analysis": "custom",
-        "leader": "custom",
     }
     candidate = aliases.get(candidate, candidate)
     if candidate in SELECTION_DOMAINS:
@@ -1070,6 +1067,8 @@ def convex_hull_geometry(
     reduced = reduce_points_for_hull(raw, max_points=max_points)
     if reduced.shape[0] < 3:
         return HullGeometry(input_count=raw.shape[0], geometry_count=reduced.shape[0], method="convex")
+    from scipy.spatial import ConvexHull, QhullError
+
     try:
         hull = ConvexHull(_normalize_points(reduced))
     except QhullError:
@@ -1165,6 +1164,8 @@ def concave_hull_geometry(
     if reduced.shape[0] < 4:
         return convex_hull_geometry(reduced, max_points=max_points)
     normalized = _normalize_points(reduced)
+    from scipy.spatial import Delaunay, QhullError, cKDTree
+
     try:
         triangulation = Delaunay(normalized)
     except QhullError:
@@ -1225,6 +1226,8 @@ def _neighbor_components(points: np.ndarray) -> list[np.ndarray]:
     if count < 3:
         return []
     normalized = _normalize_points(points)
+    from scipy.spatial import cKDTree
+
     tree = cKDTree(normalized)
     k = min(6, count)
     distances, neighbors = tree.query(normalized, k=k)

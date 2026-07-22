@@ -71,6 +71,7 @@ class LinkedViewController:
         self._spatial_axes: set[int] = set()
         self._altitude_axes: set[int] = set()
         self._connections: list[int] = []
+        self._axis_connections: list[tuple[object, int]] = []
         self._history_states: dict[int, dict[str, Any]] = {}
         self._history_suspended = False
         self._auto_fit_spatial = True
@@ -79,6 +80,9 @@ class LinkedViewController:
         self._press_mode = ""
         self._press_axis = None
         self._explicit_release_event_id: int | None = None
+        self._fast_pan_active = False
+        self._fast_pan_proxy_active = False
+        self._fast_pan_saved_displayed_count: int | None = None
         if not self.enabled:
             return
 
@@ -143,8 +147,12 @@ class LinkedViewController:
         self._wheel_timer.single_shot = True
         self._wheel_timer.add_callback(self._commit_wheel_zoom)
         for axis in axes:
-            axis.callbacks.connect("xlim_changed", self._schedule)
-            axis.callbacks.connect("ylim_changed", self._schedule)
+            self._axis_connections.append(
+                (axis, axis.callbacks.connect("xlim_changed", self._schedule))
+            )
+            self._axis_connections.append(
+                (axis, axis.callbacks.connect("ylim_changed", self._schedule))
+            )
         self._connections.extend(
             [
                 figure.canvas.mpl_connect("button_press_event", self._on_button_press),
@@ -341,6 +349,125 @@ class LinkedViewController:
             # applying the behavior to every supported color quantity.
             self.metadata["remap_time_colors"] = self._remap_colormap
             self.metadata["remap_colormap"] = self._remap_colormap
+
+    def refresh_display(
+        self,
+        *,
+        preview_point_limit: int | None = None,
+        update_subset: bool = False,
+        notify: bool = False,
+        redraw: bool = True,
+    ) -> None:
+        """Refresh existing artists without rebuilding the Matplotlib figure."""
+        if not self.enabled:
+            return
+        if preview_point_limit is not None:
+            self.metadata["preview_point_limit"] = max(0, int(preview_point_limit))
+            update_subset = True
+        if update_subset:
+            norm = self.metadata.get("norm") or self._norm_for_mask(self._active_mask)
+            self._set_scatter_subset(self._active_mask, norm)
+        if notify:
+            self._notify_state()
+        if redraw:
+            self.figure.canvas.draw_idle()
+
+    def begin_fast_pan(self, *, point_limit: int = 3_500) -> bool:
+        """Temporarily render a small, stable proxy population during panning."""
+        if not self.enabled or self._fast_pan_active:
+            return False
+        self._fast_pan_active = True
+        self._fast_pan_proxy_active = False
+        self._fast_pan_saved_displayed_count = int(
+            self.metadata.get("displayed_count", self.visible_count)
+        )
+        normal_limit = int(self.metadata.get("preview_point_limit", 0) or 0)
+        current_count = int(self.metadata.get("displayed_count", self.visible_count))
+        effective_limit = max(250, int(point_limit))
+        if normal_limit > 0:
+            effective_limit = min(effective_limit, normal_limit)
+        if current_count <= effective_limit:
+            self.metadata["fast_pan_active"] = True
+            return False
+
+        self.metadata["preview_point_limit"] = effective_limit
+        try:
+            norm = self.metadata.get("norm") or self._norm_for_mask(self._active_mask)
+            self._set_scatter_subset(self._active_mask, norm)
+        finally:
+            self.metadata["preview_point_limit"] = normal_limit
+        self.metadata["fast_pan_active"] = True
+        self._fast_pan_proxy_active = True
+        self.figure.canvas.draw_idle()
+        return True
+
+    def end_fast_pan(
+        self,
+        *,
+        restore_artists: bool = True,
+        redraw: bool = True,
+    ) -> bool:
+        """Restore the ordinary source population after a pan gesture."""
+        if not self._fast_pan_active:
+            return False
+        restore = self._fast_pan_proxy_active
+        self._fast_pan_active = False
+        self._fast_pan_proxy_active = False
+        self.metadata["fast_pan_active"] = False
+        if restore and restore_artists and self.enabled:
+            norm = self.metadata.get("norm") or self._norm_for_mask(self._active_mask)
+            self._set_scatter_subset(self._active_mask, norm)
+        elif self._fast_pan_saved_displayed_count is not None:
+            self.metadata["displayed_count"] = int(
+                self._fast_pan_saved_displayed_count
+            )
+        self._fast_pan_saved_displayed_count = None
+        if restore and restore_artists and redraw:
+            self.figure.canvas.draw_idle()
+        return restore
+
+    def close(self) -> None:
+        """Disconnect timers and callbacks before a figure is replaced."""
+        self.end_fast_pan(restore_artists=False, redraw=False)
+        if not self.enabled and not self._connections and not self._axis_connections:
+            return
+        for timer_name in ("_timer", "_release_timer", "_wheel_timer"):
+            timer = getattr(self, timer_name, None)
+            if timer is None:
+                continue
+            try:
+                timer.stop()
+            except Exception:
+                pass
+            callbacks = getattr(timer, "callbacks", None)
+            if isinstance(callbacks, list):
+                callbacks.clear()
+            setattr(self, timer_name, None)
+        canvas = getattr(self.figure, "canvas", None)
+        if canvas is not None:
+            for connection in self._connections:
+                try:
+                    canvas.mpl_disconnect(connection)
+                except Exception:
+                    pass
+        for axis, connection in self._axis_connections:
+            try:
+                axis.callbacks.disconnect(connection)
+            except Exception:
+                pass
+        self._connections.clear()
+        self._axis_connections.clear()
+        self._history_states.clear()
+        if self.toolbar is not None and hasattr(self.toolbar, "set_linked_controller"):
+            try:
+                self.toolbar.set_linked_controller(None)
+            except Exception:
+                pass
+        self._state_callback = None
+        self._fast_pan_active = False
+        self._fast_pan_proxy_active = False
+        self._fast_pan_saved_displayed_count = None
+        self.enabled = False
 
     def _toolbar_mode(self) -> str:
         toolbar = self.toolbar
@@ -637,7 +764,10 @@ class LinkedViewController:
         explicitly after its superclass completes, making the shared scientific
         altitude constraint authoritative in the same committed gesture.
         """
+        is_pan = str(kind).casefold() == "pan"
         if self._updating or not self.enabled:
+            if is_pan:
+                self.end_fast_pan(redraw=False)
             return
         self._explicit_release_event_id = id(event)
         axes = tuple(self.metadata.get("axis_order", ()))
@@ -652,7 +782,13 @@ class LinkedViewController:
         self._release_axis = None
         self._release_kind = ""
         if axis not in axes:
+            if is_pan:
+                self.end_fast_pan(redraw=True)
             return
+        if is_pan:
+            # update_now() installs the exact final subset, so avoid rebuilding
+            # the ordinary population once immediately beforehand.
+            self.end_fast_pan(restore_artists=False, redraw=False)
         # Both rectangle zoom and toolbar pan/drag are committed scientific
         # view changes.  The final driver-axis limits become named constraints,
         # including the shared altitude range when present in the panel.
@@ -671,8 +807,13 @@ class LinkedViewController:
         kind = self._release_kind
         self._release_axis = None
         self._release_kind = ""
+        is_pan = str(kind).casefold() == "pan"
         if axis not in self.metadata["axis_order"]:
+            if is_pan:
+                self.end_fast_pan(redraw=True)
             return
+        if is_pan:
+            self.end_fast_pan(restore_artists=False, redraw=False)
         # Generic backends reach this delayed path rather than the explicit Qt
         # toolbar callback.  Pan/drag and rectangle zoom therefore share the
         # same scientific commit path and history semantics.

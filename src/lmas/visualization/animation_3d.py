@@ -170,6 +170,7 @@ def animate_3d_snapshot(
     """Render an off-screen 3D animation from an LMAS snapshot."""
 
     pv = _require_pyvista()
+    _silence_vtk_cleanup_logging()
     if mode not in {"orbit", "develop", "develop-orbit"}:
         raise ConfigurationError(f"Unknown animation mode: {mode}")
     if fps <= 0 or duration_s <= 0 or hold_end_s < 0:

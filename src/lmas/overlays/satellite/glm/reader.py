@@ -7,7 +7,6 @@ from pathlib import Path
 import re
 from typing import Iterable, Sequence
 
-import h5py
 import numpy as np
 
 from .roles import resolve_operational_role, role_consistent_with_longitude
@@ -371,6 +370,8 @@ def read_glm_l2_lcfa(
 
 
 def _read_single_file(path: Path) -> dict[str, object]:
+    import h5py
+
     try:
         handle = h5py.File(path, "r")
     except OSError as exc:

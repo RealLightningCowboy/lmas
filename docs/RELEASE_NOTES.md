@@ -1,20 +1,31 @@
-# LMAS 1.6.1 release notes
+# LMAS 1.6.2 release notes
 
-LMAS 1.6.1 is a focused corrective release for GOES-R GLM event-footprint rendering. GLM events in the selected time window are now accumulated by fixed-grid detector pixel before map drawing, matching the established glmtools behavior used by the legacy LMAS workflow.
+LMAS 1.6.2 is a responsiveness and interaction release for the stable 1.6 line. It carries the proven performance work from the later development builds into the published 1.6 feature set, without adding new scientific workspaces or changing established Project and product formats.
 
-## Corrected GLM Total Optical Energy
+## Main-window responsiveness
 
-- All selected events occupying the same GLM detector pixel are summed across the complete visible time window.
-- LMAS draws one footprint polygon per accumulated pixel rather than overlapping successive raw event layers.
-- Each footprint is colored by its accumulated Total Optical Energy.
-- Footprint geometry remains based on the operational GLM fixed grid and lightning-ellipsoid correction.
-- Shared East/West and per-dataset color normalization now use accumulated pixel energies.
-- The interactive footprint cap is applied after accumulation.
+- The Qt canvas and Matplotlib toolbar are retained across ordinary redraws instead of being destroyed and recreated.
+- Cosmetic controls update existing artists in place when the figure structure does not need to change.
+- Plot-ready NumPy arrays and repeated scientific selections are cached against the loaded source store.
+- Linked-view controllers and callbacks are disconnected cleanly when a structural redraw is required.
 
-## Validation
+## Faster panning
 
-The packaged Oklahoma demonstration selects 495 GOES-16 events in the saved flash window and consolidates them into 74 detector pixels. Event energy is conserved exactly within floating-point tolerance, the busiest pixel contains 68 events, and the brightest accumulated pixel is approximately 1960.8714 fJ. The corrected rendering was visually compared with the established glmtools reference.
+While the mouse is held down, LMAS temporarily displays a stable 1,500-source proxy and renders only the moving scientific panel at a bounded update rate. Releasing the mouse restores the configured preview population, applies the exact final limits, updates linked scientific membership once, and performs one complete redraw.
+
+## Interactive animation
+
+- **View proj.** opens inside the running LMAS application and reuses the already-loaded Project and source data.
+- Interactive projection and 3D viewers use time-stratified point limits while saved animations remain uncapped.
+- Projection frames use pre-sorted source times, binary-search slices, reusable buffers, elapsed-time playback, missed-frame skipping, throttled timeline scrubbing, and Matplotlib blitting.
+- The Space bar controls projection Play/Pause immediately after the viewer opens.
+- Projection and 3D animations begin at the exact start of the selected time window, even when the first frames contain no sources.
+- 3D shutdown handling is more defensive when a native VTK window closes or the graphics backend fails.
+
+## Startup
+
+LMAS now shows a small startup window before importing the full GUI stack. Initial Project or data loading begins after the Qt event loop starts, and optional readers, overlays, dialogs, product exporters, plotting helpers, and analysis tools are imported only when needed.
 
 ## Scope
 
-This release changes GLM pixel accumulation and footprint coloring only. It does not alter GLM event/group/flash parent relationships, LMA processing, network overlays, project formats, or the established 1.6.0 interface behavior.
+The release preserves 1.6 scientific filtering, source selection, charge analysis, overlays, saved figures, saved animations, data products, Project/Profile compatibility, and command-line workflows. The performance changes affect interactive preparation and rendering; exact exports remain based on the complete selected source population.

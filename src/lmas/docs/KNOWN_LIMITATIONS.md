@@ -1,4 +1,4 @@
-# LMAS 1.6.1 known limitations
+# LMAS 1.6.2 known limitations
 
 ## Data and analysis
 

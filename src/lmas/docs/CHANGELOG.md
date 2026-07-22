@@ -1,5 +1,18 @@
 # LMAS changelog
 
+## 1.6.2
+
+- Backported the proven LMAS responsiveness work to the stable 1.6 release line without changing its public analysis feature set.
+- Reused the main Qt canvas and Matplotlib toolbar across redraws and updated ordinary display changes in place where possible.
+- Added cached plotting arrays and selected-dataset reuse to avoid repeated scientific data preparation during cosmetic redraws.
+- Added fast interactive panning with a temporary 1,500-source proxy, bounded pointer updates, active-panel blitting, and one exact redraw on release.
+- Opened interactive projection animations in the existing LMAS process, eliminating the temporary Project, second interpreter startup, and second source-file read.
+- Added time-stratified interactive point budgets, pre-sorted animation times, binary-search frame slices, wall-clock frame skipping, throttled scrubbing, and Matplotlib blitting.
+- Made the projection Space bar available immediately for Play/Pause and aligned projection and 3D animation starts with the selected time-window boundary.
+- Improved interactive 3D point handling and defensive VTK shutdown cleanup while leaving saved products uncapped.
+- Added a lightweight visible startup shell and deferred optional analysis, reader, overlay, and plotting imports until needed.
+- Preserved exact saved-figure and saved-animation behavior, Project compatibility, scientific filtering, and the established 1.6 interface.
+
 ## 1.6.1
 
 - Corrected GLM Total Optical Energy footprint rendering by accumulating all selected events by fixed-grid detector pixel before drawing.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import math
 from pathlib import Path
@@ -160,6 +160,55 @@ def _require_pyvista():
     return pv
 
 
+def _quiet_vtk_console() -> None:
+    """Prevent repeated driver diagnostics from flooding detached terminals.
+
+    A real Python/VTK exception still propagates normally. This only disables
+    VTK's duplicate C++ warning/error stream, which can otherwise emit the same
+    shader diagnostic hundreds of times after an OpenGL capability failure.
+    """
+
+    try:
+        from vtkmodules.vtkCommonCore import vtkLogger, vtkObject
+
+        try:
+            vtkObject.GlobalWarningDisplayOff()
+        except Exception:
+            pass
+        try:
+            verbosity = getattr(vtkLogger, "VERBOSITY_OFF", None)
+            if verbosity is not None:
+                vtkLogger.SetStderrVerbosity(verbosity)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+def _finalize_interactive_plotter(plotter) -> None:
+    """Close the interactive VTK window without post-close render attempts."""
+
+    if plotter is None:
+        return
+    _quiet_vtk_console()
+    render_window = getattr(plotter, "render_window", None) or getattr(
+        plotter, "ren_win", None
+    )
+    try:
+        plotter.close()
+    except Exception:
+        pass
+    if render_window is not None:
+        try:
+            render_window.RemoveAllObservers()
+        except Exception:
+            pass
+        try:
+            render_window.Finalize()
+        except Exception:
+            pass
+
+
 def _parse_window_size(window_size: tuple[int, int] | list[int]) -> tuple[int, int]:
     if len(window_size) != 2:
         raise ConfigurationError("Window size must contain width and height")
@@ -220,18 +269,30 @@ def visibility_alpha(
     display_mode: DisplayMode,
     trail_ms: float,
     afterimage_ms: float,
+    out: np.ndarray | None = None,
 ) -> np.ndarray:
     times = np.asarray(time_ms, dtype=float)
+    if out is None:
+        alpha = np.empty(times.size, dtype=np.uint8)
+    else:
+        alpha = np.asarray(out)
+        if alpha.dtype != np.uint8 or alpha.shape != times.shape:
+            raise ValueError("Alpha output buffer must be uint8 and match source times")
+        if not alpha.flags.writeable:
+            raise ValueError("Alpha output buffer must be writable")
     if display_mode == "full":
-        return np.full(times.size, 255, dtype=np.uint8)
+        alpha.fill(255)
+        return alpha
     if display_mode == "cumulative":
-        return np.where(times <= current_ms, 255, 0).astype(np.uint8)
+        alpha.fill(0)
+        alpha[times <= current_ms] = 255
+        return alpha
     if display_mode == "trail":
         if trail_ms <= 0:
             raise ConfigurationError("Trail duration must be positive")
         age = current_ms - times
         visible = (age >= 0) & (age <= trail_ms)
-        alpha = np.zeros(times.size, dtype=np.uint8)
+        alpha.fill(0)
         if np.any(visible):
             fade = 0.18 + 0.82 * (1.0 - age[visible] / trail_ms)
             alpha[visible] = np.asarray(np.clip(np.round(255.0 * fade), 1, 255), dtype=np.uint8)
@@ -242,7 +303,7 @@ def visibility_alpha(
         age = current_ms - times
         completed = age >= 0
         recent = completed & (age <= afterimage_ms)
-        alpha = np.zeros(times.size, dtype=np.uint8)
+        alpha.fill(0)
         if np.any(recent):
             fade = 0.18 + 0.82 * (1.0 - age[recent] / afterimage_ms)
             alpha[recent] = np.asarray(np.clip(np.round(255.0 * fade), 1, 255), dtype=np.uint8)
@@ -261,15 +322,28 @@ def frame_display_rgba(
     afterimage_ms: float,
     cmap: str | None = None,
     reverse_cmap: bool = False,
+    out: np.ndarray | None = None,
 ) -> np.ndarray:
     times = np.asarray(time_ms, dtype=float)
-    rgba = np.array(base_rgba, copy=True)
-    rgba[:, 3] = visibility_alpha(
+    base = np.asarray(base_rgba, dtype=np.uint8)
+    if base.ndim != 2 or base.shape[1:] != (4,) or times.shape != (base.shape[0],):
+        raise ValueError("Base colors and source times must describe the same RGBA population")
+    if out is None:
+        rgba = np.array(base, copy=True)
+    else:
+        rgba = np.asarray(out)
+        if rgba.dtype != np.uint8 or rgba.shape != base.shape:
+            raise ValueError("RGBA output buffer must be uint8 and match the base-color array")
+        if not rgba.flags.writeable:
+            raise ValueError("RGBA output buffer must be writable")
+        np.copyto(rgba, base)
+    visibility_alpha(
         times,
         current_ms,
         display_mode=display_mode,
         trail_ms=trail_ms,
         afterimage_ms=afterimage_ms,
+        out=rgba[:, 3],
     )
     if display_mode == "trail-afterimage":
         age = float(current_ms) - times
@@ -797,6 +871,7 @@ def _configure_scene(
     theme: str,
     show_grid_and_labels: bool = True,
     anchored_axis_presentation: bool = False,
+    total_source_count: int | None = None,
 ) -> None:
     background = _background(theme)
     plotter.set_background(background)
@@ -815,8 +890,13 @@ def _configure_scene(
         plotter._lmas_grid_spec = (grid_bounds, label_counts)
         _add_base_grid(plotter)
         _enable_anchored_axis_presentation(plotter, anchored_axis_presentation)
+    total = max(int(snapshot.source_count), int(total_source_count or snapshot.source_count))
+    if snapshot.source_count < total:
+        population = f"{snapshot.source_count:,} displayed of {total:,} sources"
+    else:
+        population = f"{total:,} sources"
     title = (
-        f"{snapshot.title} — Interactive 3D Viewer ({snapshot.source_count:,} sources)\n"
+        f"{snapshot.title} — Interactive 3D Viewer ({population})\n"
         f"{snapshot.event_timestamp}\nAltitude: km MSL; no ground subtraction"
     )
     plotter.add_text(
@@ -848,8 +928,13 @@ def _point_render_options(render_profile: RenderProfile) -> dict[str, Any]:
 def _add_point_cloud(plotter, snapshot: VisualizationSnapshot, *, cmap: str, reverse_cmap: bool, point_size: float, render_profile: RenderProfile):
     pv = _require_pyvista()
     mesh = pv.PolyData(snapshot.points_km)
-    rgba = _base_rgba(snapshot, cmap, reverse_cmap=reverse_cmap)
-    mesh["source_rgba"] = rgba
+    rgba = np.ascontiguousarray(
+        _base_rgba(snapshot, cmap, reverse_cmap=reverse_cmap), dtype=np.uint8
+    )
+    # Keep the immutable base colors separate from the VTK-owned display array.
+    # Otherwise an in-place frame update can silently corrupt the colors used to
+    # construct every subsequent frame.
+    mesh["source_rgba"] = np.array(rgba, copy=True)
     mesh["source_time_ms"] = snapshot.time_ms
     plotter.add_points(
         mesh,
@@ -864,8 +949,15 @@ def _add_point_cloud(plotter, snapshot: VisualizationSnapshot, *, cmap: str, rev
 
 
 def _set_mesh_rgba(mesh, rgba: np.ndarray) -> None:
-    values = np.asarray(rgba, dtype=np.uint8).copy()
-    mesh["source_rgba"] = values
+    values = np.asarray(rgba, dtype=np.uint8)
+    try:
+        target = np.asarray(mesh["source_rgba"], dtype=np.uint8)
+    except Exception:
+        target = np.empty((0, 4), dtype=np.uint8)
+    if target.shape == values.shape:
+        np.copyto(target, values)
+    else:
+        mesh["source_rgba"] = np.ascontiguousarray(values)
     point_data = mesh.GetPointData()
     if point_data is not None:
         array = point_data.GetArray("source_rgba")
@@ -873,6 +965,27 @@ def _set_mesh_rgba(mesh, rgba: np.ndarray) -> None:
             array.Modified()
         point_data.Modified()
     mesh.Modified()
+
+
+def _time_stratified_snapshot(
+    snapshot: VisualizationSnapshot, point_limit: int
+) -> VisualizationSnapshot:
+    limit = int(point_limit)
+    if limit < 0:
+        raise ConfigurationError("Interactive point limit cannot be negative")
+    count = int(snapshot.source_count)
+    if limit <= 0 or count <= limit:
+        return snapshot
+    time_order = np.argsort(np.asarray(snapshot.time_ms, dtype=float), kind="stable")
+    positions = time_order[np.linspace(0, count - 1, limit, dtype=np.int64)]
+    return replace(
+        snapshot,
+        time_utc_ns=np.ascontiguousarray(snapshot.time_utc_ns[positions]),
+        time_ms=np.ascontiguousarray(snapshot.time_ms[positions]),
+        points_km=np.ascontiguousarray(snapshot.points_km[positions]),
+        source_ids=np.ascontiguousarray(snapshot.source_ids[positions]),
+        color_values=np.ascontiguousarray(snapshot.color_values[positions]),
+    )
 
 
 def _interactive_visibility_mode(display_mode: DisplayMode) -> DisplayMode:
@@ -895,12 +1008,16 @@ def view_3d_snapshot(
     camera_output: str | Path | None = None,
     playback_fps: float = 30.0,
     playback_duration_s: float = 15.0,
+    point_limit: int = 50_000,
     start_playing: bool = False,
     show_grid_and_labels: bool = True,
     window_size: tuple[int, int] = (1400, 900),
 ) -> None:
     pv = _require_pyvista()
+    _quiet_vtk_console()
     snapshot = load_visualization_snapshot(snapshot_path)
+    total_source_count = int(snapshot.source_count)
+    snapshot = _time_stratified_snapshot(snapshot, point_limit)
     if point_size <= 0 or playback_fps <= 0 or playback_duration_s <= 0:
         raise ConfigurationError("Point size, playback FPS, and duration must be positive")
     window = _parse_window_size(window_size)
@@ -919,6 +1036,7 @@ def view_3d_snapshot(
         theme=theme,
         show_grid_and_labels=show_grid_and_labels,
         anchored_axis_presentation=interaction_mode == "z-orbit",
+        total_source_count=total_source_count,
     )
     first_time, final_time = snapshot.time_limits
     visibility_mode = _interactive_visibility_mode(display_mode)
@@ -929,28 +1047,72 @@ def view_3d_snapshot(
     )
     source_span = max(final_time - first_time, 1.0e-12)
     playback_duration = playback_duration_s * (playback_final - first_time) / source_span
-    initial_time = first_time if start_playing else playback_final
+    # Always open at the beginning of the selected time window. Space/P
+    # already toggles playback immediately; start_playing only controls whether
+    # the clock begins advancing without a key press.
+    initial_time = first_time
     playback = PlaybackClock(first_time, playback_final, playback_duration, initial_time)
     output_camera = (
         Path(camera_output).expanduser().resolve()
         if camera_output is not None
         else Path(snapshot_path).expanduser().resolve().with_suffix(".camera.json")
     )
-    state: dict[str, Any] = {"programmatic_slider": False}
+    state: dict[str, Any] = {
+        "programmatic_slider": False,
+        "last_slider_render_s": 0.0,
+        "last_time_status_s": 0.0,
+    }
+    rgba_buffer = np.empty_like(base_rgba)
+    playback_status_actor = plotter.add_text(
+        "",
+        position=(18, 18),
+        font_size=_STATUS_FONT_SIZE,
+        name="playback-status",
+    )
+    time_status_actor = plotter.add_text(
+        "",
+        position=(max(18, window[0] - 430), 18),
+        font_size=_STATUS_FONT_SIZE,
+        name="time-status",
+    )
+    interaction_actor = plotter.add_text(
+        "",
+        position=(50, 153),
+        font_size=_CONTROL_FONT_SIZE,
+        name="interaction-mode",
+    )
+
+    def set_text(actor, text: str, *, fallback_name: str, position, font_size: int) -> None:
+        try:
+            actor.SetInput(str(text))
+        except Exception:
+            # Older PyVista/VTK combinations may return an annotation wrapper
+            # instead of a vtkTextActor.  Retain a compatible fallback.
+            plotter.add_text(
+                str(text),
+                position=position,
+                font_size=font_size,
+                name=fallback_name,
+            )
 
     def mode_text() -> str:
         if visibility_mode == "trail":
-            return f"trail: {trail_ms:g} ms"
-        if visibility_mode == "trail-afterimage":
-            return f"trail + afterimage: {afterimage_ms:g} ms"
-        return "cumulative"
+            mode = f"trail: {trail_ms:g} ms"
+        elif visibility_mode == "trail-afterimage":
+            mode = f"trail + afterimage: {afterimage_ms:g} ms"
+        else:
+            mode = "cumulative"
+        if snapshot.source_count < total_source_count:
+            mode += f" | {snapshot.source_count:,} of {total_source_count:,} sources"
+        return mode
 
     def update_status(*, render: bool = False) -> None:
-        plotter.add_text(
+        set_text(
+            playback_status_actor,
             f"{'Playing' if playback.playing else 'Paused'} | {mode_text()}",
+            fallback_name="playback-status",
             position=(18, 18),
             font_size=_STATUS_FONT_SIZE,
-            name="playback-status",
         )
         if render:
             plotter.render()
@@ -967,15 +1129,20 @@ def view_3d_snapshot(
             afterimage_ms=afterimage_ms,
             cmap=cmap if snapshot.color_by == "time" else None,
             reverse_cmap=reverse_cmap,
+            out=rgba_buffer,
         )
         _set_mesh_rgba(mesh, rgba)
         visible = int(np.count_nonzero(rgba[:, 3]))
-        plotter.add_text(
-            f"Source time: {current:.3f} ms   Visible: {visible:,}",
-            position=(max(18, window[0] - 430), 18),
-            font_size=_STATUS_FONT_SIZE,
-            name="time-status",
-        )
+        now = time.monotonic()
+        if render or not playback.playing or now - float(state["last_time_status_s"]) >= 0.10:
+            state["last_time_status_s"] = now
+            set_text(
+                time_status_actor,
+                f"Source time: {current:.3f} ms   Visible: {visible:,}",
+                fallback_name="time-status",
+                position=(max(18, window[0] - 430), 18),
+                font_size=_STATUS_FONT_SIZE,
+            )
         if render:
             plotter.render()
 
@@ -992,9 +1159,16 @@ def view_3d_snapshot(
             state["programmatic_slider"] = False
 
     def slider_callback(value: float) -> None:
-        if not state["programmatic_slider"]:
-            playback.seek(float(value), pause=True)
-            update_status()
+        if state["programmatic_slider"]:
+            # Playback updates the VTK slider and scene explicitly.  Rendering
+            # from this callback as well doubles all per-frame animation work.
+            return
+        playback.seek(float(value), pause=True)
+        update_status()
+        now = time.monotonic()
+        if now - float(state["last_slider_render_s"]) < (1.0 / 30.0):
+            return
+        state["last_slider_render_s"] = now
         update_scene(float(value))
 
     slider = plotter.add_slider_widget(
@@ -1011,6 +1185,23 @@ def view_3d_snapshot(
         tube_width=0.006,
     )
 
+    def slider_end_callback(widget, _event=None) -> None:
+        if state["programmatic_slider"]:
+            return
+        try:
+            value = float(widget.GetRepresentation().GetValue())
+        except Exception:
+            return
+        playback.seek(value, pause=True)
+        state["last_slider_render_s"] = time.monotonic()
+        update_status()
+        update_scene(value)
+
+    try:
+        slider.AddObserver("EndInteractionEvent", slider_end_callback)
+    except Exception:
+        pass
+
     camera = load_camera_settings(camera_path) if camera_path is not None else _default_camera(snapshot, window_size=window)
     _apply_camera(plotter, camera)
 
@@ -1018,11 +1209,12 @@ def view_3d_snapshot(
         mode: InteractionMode = "z-orbit" if enabled else "full-3d"
         _set_interaction_mode(plotter, mode)
         _enable_anchored_axis_presentation(plotter, enabled)
-        plotter.add_text(
+        set_text(
+            interaction_actor,
             "Camera: Z-axis orbit" if enabled else "Camera: full 3D orbit",
+            fallback_name="interaction-mode",
             position=(50, 153),
             font_size=_CONTROL_FONT_SIZE,
-            name="interaction-mode",
         )
         _reset_camera_clipping(plotter)
         try:
@@ -1074,6 +1266,11 @@ def view_3d_snapshot(
         playback.play()
     update_status(render=False)
     print(f"[lmas view-3d] camera save target: {output_camera}")
+    if snapshot.source_count < total_source_count:
+        print(
+            f"[lmas view-3d] interactive preview: {snapshot.source_count:,} "
+            f"of {total_source_count:,} sources"
+        )
     plotter.show(auto_close=False, interactive_update=True)
     _enforce_integer_grid_actor(plotter)
     set_z_orbit(interaction_mode == "z-orbit")
@@ -1085,13 +1282,11 @@ def view_3d_snapshot(
             if changed:
                 set_slider_value(current)
                 update_scene(current, render=False)
-                update_status(render=False)
             if changed or axes_changed:
                 plotter.render()
             time.sleep(min(0.005, 0.25 / playback_fps))
     finally:
-        if not getattr(plotter, "_closed", False):
-            plotter.close()
+        _finalize_interactive_plotter(plotter)
 
 
 

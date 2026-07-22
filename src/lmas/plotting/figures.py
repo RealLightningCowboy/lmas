@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
+import matplotlib as mpl
 import matplotlib.dates as mdates
 import numpy as np
 from matplotlib.colors import BoundaryNorm, ListedColormap
@@ -10,14 +12,15 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoMinorLocator, FuncFormatter, MaxNLocator
 
 from ..coordinates import (
-    altitude_km,
-    event_local_coordinates,
+    altitude_values_km,
+    latlon_to_local_km,
     station_center_latlon,
     station_center_local_km,
     station_local_coordinates,
 )
 from ..errors import DatasetError
 from ..model import FilterSpec, LMAProject, PlotSpec
+from ..selection import event_selection_mask
 from ..source_selection import (
     CHARGE_COLORS,
     charge_region_label,
@@ -29,7 +32,6 @@ from .common import (
     apply_figure_theme,
     automatic_point_size,
     centered_span_limits,
-    color_values,
     finite_limits,
     resolved_cmap,
     save_figure,
@@ -80,44 +82,104 @@ def _view_title(
     return formatter
 
 
-def _finite_coordinate_arrays(project: LMAProject, dataset):
-    """Return finite loaded-source arrays without applying source-quality cuts."""
-    time = np.asarray(dataset["event_time"].values).astype("datetime64[ns]")
-    lat = np.asarray(dataset["event_latitude"].values, dtype=float)
-    lon = np.asarray(dataset["event_longitude"].values, dtype=float)
-    alt = altitude_km(dataset)
-    east, north = event_local_coordinates(
-        dataset,
+@dataclass(frozen=True)
+class _ProjectEventArrays:
+    """Converted event arrays cached for the lifetime of one source store.
+
+    The immutable :class:`~lmas.source_store.LmaSourceStore` is already the
+    authoritative data container.  Interactive figure creation used to copy
+    every event-aligned variable into a selected store, rebuild an xarray
+    Dataset, and then immediately convert the handful of plotting fields back
+    to NumPy.  Keeping these converted coordinate arrays beside the project
+    removes that round trip and makes repeated redraws substantially cheaper.
+    """
+
+    time: np.ndarray
+    time_num: np.ndarray
+    latitude: np.ndarray
+    longitude: np.ndarray
+    altitude: np.ndarray
+    east: np.ndarray
+    north: np.ndarray
+    source_ids: np.ndarray
+    finite_coordinates: np.ndarray
+
+
+def _project_event_arrays(project: LMAProject) -> _ProjectEventArrays:
+    store = project.source_store
+    key = (
+        id(store),
+        int(store.event_count),
+        float(project.reference_longitude),
+        float(project.reference_latitude),
+    )
+    cached = getattr(project, "_lmas_plot_event_array_cache", None)
+    if isinstance(cached, tuple) and len(cached) == 2 and cached[0] == key:
+        return cached[1]
+
+    time = np.asarray(store.event_array("event_time")).astype("datetime64[ns]")
+    latitude = np.asarray(store.event_array("event_latitude"), dtype=float)
+    longitude = np.asarray(store.event_array("event_longitude"), dtype=float)
+    altitude = altitude_values_km(
+        store.event_array("event_altitude"),
+        str(store.field_attrs("event_altitude").get("units", "")),
+    )
+    east, north = latlon_to_local_km(
+        longitude,
+        latitude,
         project.reference_longitude,
         project.reference_latitude,
     )
     source_ids = np.asarray(
-        dataset.get("event_source_index", np.arange(time.size)).values
-        if hasattr(dataset.get("event_source_index", None), "values")
-        else np.arange(time.size),
-        dtype=np.int64,
+        store.event_array("event_source_index"), dtype=np.int64
     )
-    mask = (
-        (~np.isnat(time))
-        & np.isfinite(lat)
-        & np.isfinite(lon)
-        & np.isfinite(alt)
+    time_num = np.full(time.shape, np.nan, dtype=float)
+    valid_time = ~np.isnat(time)
+    if np.any(valid_time):
+        time_num[valid_time] = np.asarray(
+            mdates.date2num(
+                time[valid_time].astype("datetime64[us]").astype(object)
+            ),
+            dtype=float,
+        )
+    finite_coordinates = (
+        valid_time
+        & np.isfinite(time_num)
+        & np.isfinite(latitude)
+        & np.isfinite(longitude)
+        & np.isfinite(altitude)
         & np.isfinite(east)
         & np.isfinite(north)
     )
-    time = time[mask]
-    time_num = np.asarray(
-        mdates.date2num(time.astype("datetime64[us]").astype(object)), dtype=float
+    result = _ProjectEventArrays(
+        time=np.ascontiguousarray(time),
+        time_num=np.ascontiguousarray(time_num, dtype=float),
+        latitude=np.ascontiguousarray(latitude, dtype=float),
+        longitude=np.ascontiguousarray(longitude, dtype=float),
+        altitude=np.ascontiguousarray(altitude, dtype=float),
+        east=np.ascontiguousarray(east, dtype=float),
+        north=np.ascontiguousarray(north, dtype=float),
+        source_ids=np.ascontiguousarray(source_ids, dtype=np.int64),
+        finite_coordinates=np.ascontiguousarray(finite_coordinates, dtype=bool),
     )
+    setattr(project, "_lmas_plot_event_array_cache", (key, result))
+    return result
+
+
+def _finite_coordinate_arrays(project: LMAProject, _dataset=None):
+    """Return finite loaded-source arrays without applying source-quality cuts."""
+
+    arrays = _project_event_arrays(project)
+    mask = arrays.finite_coordinates
     return (
-        time,
-        time_num,
-        lat[mask],
-        lon[mask],
-        alt[mask],
-        east[mask],
-        north[mask],
-        source_ids[mask],
+        arrays.time[mask],
+        arrays.time_num[mask],
+        arrays.latitude[mask],
+        arrays.longitude[mask],
+        arrays.altitude[mask],
+        arrays.east[mask],
+        arrays.north[mask],
+        arrays.source_ids[mask],
     )
 
 
@@ -191,22 +253,77 @@ def _count_in_limits(
     return int(np.count_nonzero(mask))
 
 
-def _valid_event_arrays(project: LMAProject, dataset, plot: PlotSpec):
-    time = np.asarray(dataset["event_time"].values).astype("datetime64[ns]")
-    lat = np.asarray(dataset["event_latitude"].values, dtype=float)
-    lon = np.asarray(dataset["event_longitude"].values, dtype=float)
-    alt = altitude_km(dataset)
-    east, north = event_local_coordinates(
-        dataset,
-        project.reference_longitude,
-        project.reference_latitude,
-    )
-    source_ids = np.asarray(
-        dataset.get("event_source_index", np.arange(time.size)).values
-        if hasattr(dataset.get("event_source_index", None), "values")
-        else np.arange(time.size),
-        dtype=np.int64,
-    )
+def _numeric_color_values(
+    project: LMAProject,
+    selected_indices: np.ndarray,
+    time: np.ndarray,
+    altitude: np.ndarray,
+    plot: PlotSpec,
+) -> tuple[np.ndarray, str, mpl.colors.Normalize]:
+    mode = str(plot.color_by).lower().replace("_", "-")
+    store = project.source_store
+    if mode == "time":
+        valid_reference = time[~np.isnat(time)]
+        if valid_reference.size == 0:
+            raise DatasetError("No valid times are available for time coloring")
+        origin = valid_reference.min()
+        values = np.asarray((time - origin) / np.timedelta64(1, "s"), dtype=float)
+        label = f"Seconds after {str(origin).replace('T', ' ')[:23]} UTC"
+    elif mode == "altitude":
+        values = np.asarray(altitude, dtype=float)
+        label = "Altitude (km MSL)"
+    else:
+        mapping = {
+            "power": ("event_power", "VHF Source Power (dBW)"),
+            "stations": ("event_stations", "Contributing stations"),
+            "chi2": ("event_chi2", "Reduced χ²"),
+        }
+        try:
+            field, label = mapping[mode]
+        except KeyError as exc:
+            raise DatasetError(f"Unsupported color quantity: {plot.color_by!r}") from exc
+        if field not in store:
+            raise DatasetError(f"Cannot color by {mode}: dataset has no {field}")
+        values = np.asarray(store.event_array(field), dtype=float)[selected_indices]
+
+    finite = values[np.isfinite(values)]
+    if plot.log_color_scale:
+        finite = finite[finite > 0]
+    if finite.size == 0:
+        qualifier = "positive finite" if plot.log_color_scale else "finite"
+        raise DatasetError(f"No {qualifier} values are available for {label}")
+    low, high = float(np.min(finite)), float(np.max(finite))
+    if high <= low:
+        if plot.log_color_scale:
+            low = max(low * 0.9, np.nextafter(0.0, 1.0))
+            high = high * 1.1
+        else:
+            low -= 0.5
+            high += 0.5
+    norm: mpl.colors.Normalize
+    if plot.log_color_scale:
+        norm = mpl.colors.LogNorm(vmin=low, vmax=high)
+        if mode == "chi2":
+            label = "log₁₀(χ²)"
+    else:
+        norm = mpl.colors.Normalize(vmin=low, vmax=high)
+    return np.asarray(values, dtype=float), label, norm
+
+
+def _valid_event_arrays(project: LMAProject, filters: FilterSpec, plot: PlotSpec):
+    arrays = _project_event_arrays(project)
+    selected_mask = event_selection_mask(project, filters)
+    selected_indices = np.flatnonzero(selected_mask)
+    if selected_indices.size == 0:
+        raise DatasetError("No LMA sources pass the selected filters")
+
+    time = arrays.time[selected_indices]
+    lat = arrays.latitude[selected_indices]
+    lon = arrays.longitude[selected_indices]
+    alt = arrays.altitude[selected_indices]
+    east = arrays.east[selected_indices]
+    north = arrays.north[selected_indices]
+    source_ids = arrays.source_ids[selected_indices]
     categorical_colors: tuple[str, ...] = ()
     categorical_labels: tuple[str, ...] = ()
     if plot.color_by == "charge":
@@ -228,10 +345,12 @@ def _valid_event_arrays(project: LMAProject, dataset, plot: PlotSpec):
         color_label = "Source group"
         _group_cmap, norm = _group_cmap_and_norm(categorical_colors)
     else:
-        colors, color_label, norm = color_values(
-            dataset,
-            plot.color_by,
-            logarithmic=plot.log_color_scale,
+        colors, color_label, norm = _numeric_color_values(
+            project,
+            selected_indices,
+            time,
+            alt,
+            plot,
         )
     mask = (
         (~np.isnat(time))
@@ -246,10 +365,9 @@ def _valid_event_arrays(project: LMAProject, dataset, plot: PlotSpec):
         mask &= colors > 0
     if not np.any(mask):
         raise DatasetError("No finite LMA sources remain after filtering")
+    event_indices = selected_indices[mask]
     time = time[mask]
-    time_num = np.asarray(
-        mdates.date2num(time.astype("datetime64[us]").astype(object)), dtype=float
-    )
+    time_num = arrays.time_num[event_indices]
     source_time_s = np.asarray(
         (time - time.min()) / np.timedelta64(1, "s"), dtype=float
     )
@@ -266,7 +384,7 @@ def _valid_event_arrays(project: LMAProject, dataset, plot: PlotSpec):
         colors[mask],
         color_label,
         norm,
-        mask,
+        event_indices,
         categorical_colors,
         categorical_labels,
     )
@@ -274,8 +392,8 @@ def _valid_event_arrays(project: LMAProject, dataset, plot: PlotSpec):
 
 
 def _precision_source_values(
-    dataset,
-    valid_event_mask: np.ndarray,
+    project: LMAProject,
+    event_indices: np.ndarray,
     *,
     time: np.ndarray,
     time_num: np.ndarray,
@@ -286,20 +404,25 @@ def _precision_source_values(
     north: np.ndarray,
     source_ids: np.ndarray,
 ) -> dict[str, np.ndarray]:
-    """Return exact filtered source arrays used by Precision Mode."""
+    """Return exact filtered source arrays used by Precision Mode.
 
-    mask = np.asarray(valid_event_mask, dtype=bool)
-    size = mask.size
+    Values are gathered directly from the immutable source store.  This avoids
+    constructing a selected xarray Dataset solely to recover three optional
+    numeric fields during every main-window redraw.
+    """
+
+    indices = np.asarray(event_indices, dtype=np.int64)
+    store = project.source_store
 
     def optional(name: str) -> np.ndarray:
-        if name not in dataset:
+        if name not in store:
             return np.full(time.size, np.nan, dtype=float)
-        values = np.asarray(dataset[name].values)
-        if values.size != size:
+        values = np.asarray(store.event_array(name))
+        if values.size != store.event_count:
             return np.full(time.size, np.nan, dtype=float)
         try:
-            return np.ascontiguousarray(values[mask], dtype=float)
-        except (TypeError, ValueError):
+            return np.ascontiguousarray(values[indices], dtype=float)
+        except (TypeError, ValueError, IndexError):
             return np.full(time.size, np.nan, dtype=float)
 
     return {
@@ -1207,10 +1330,48 @@ def refresh_figure_legend(
         fig, source_axes, plot, extra_clearance_inches=extra_clearance_inches
     )
     if isinstance(metadata, dict):
-        metadata = dict(metadata)
         metadata["legend"] = legend
-        fig._lmas_metadata = metadata
     return legend
+
+
+def _refresh_panel_labels(fig, metadata: dict, plot: PlotSpec) -> tuple:
+    """Recreate panel labels without rebuilding any scientific artists."""
+
+    for artist in tuple(metadata.get("panel_labels", ())):
+        try:
+            artist.remove()
+        except Exception:
+            pass
+
+    axes_by_name = dict(metadata.get("axes", {}))
+    histogram_axis = axes_by_name.get("histogram")
+    if histogram_axis is not None:
+        for text in tuple(histogram_axis.texts):
+            if text.get_gid() == "lmas-panel-label-e":
+                try:
+                    text.remove()
+                except Exception:
+                    pass
+        _add_histogram_panel_label(
+            histogram_axis,
+            plot,
+            portrait=metadata.get("layout") == "xlma",
+        )
+
+    artists = _add_panel_labels(
+        tuple(metadata.get("axis_order", ())),
+        plot,
+        histogram_axis=histogram_axis,
+        portrait=metadata.get("layout") == "xlma",
+    )
+    ordinary_delta, _ = _text_size_offsets(plot)
+    if ordinary_delta:
+        for artist in artists:
+            if getattr(artist, "get_gid", lambda: None)() == "lmas-panel-label-e":
+                continue
+            artist.set_fontsize(float(artist.get_fontsize()) + ordinary_delta)
+    metadata["panel_labels"] = artists
+    return tuple(artists)
 
 
 def _plot_stations_local_portrait(
@@ -1335,11 +1496,8 @@ def _update_altitude_histogram(axis, altitude, mask, altitude_limits, plot: Plot
 
 
 def create_intfs_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec) -> Figure:
-    selected = project.selected_dataset(filters)
-    if selected.sizes.get("number_of_events", 0) == 0:
-        raise DatasetError("No LMA sources pass the selected filters")
     (time, time_num, source_time_s, lat, lon, alt, east, north, source_ids,
-     colors, color_label, norm, valid_event_mask, categorical_colors, categorical_labels) = _valid_event_arrays(project, selected, plot)
+     colors, color_label, norm, event_indices, categorical_colors, categorical_labels) = _valid_event_arrays(project, filters, plot)
     filtered_count = len(time)
     size = plot.point_size or automatic_point_size(filtered_count)
     if plot.color_by == "charge":
@@ -1366,13 +1524,13 @@ def create_intfs_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec
                                     east_west_viewpoint=plot.east_west_viewpoint,
                                     north_south_viewpoint=plot.north_south_viewpoint,
                                     mode=plot.depth_mode)
-    raw_time, raw_time_num, raw_lat, raw_lon, raw_alt, raw_east, raw_north, raw_source_ids = _finite_coordinate_arrays(project, project.dataset)
+    raw_time, raw_time_num, raw_lat, raw_lon, raw_alt, raw_east, raw_north, raw_source_ids = _finite_coordinate_arrays(project)
     raw_x = east_sign * raw_east if is_local else raw_lon
     raw_y = north_sign * raw_north if is_local else raw_lat
     filtered_coordinate_values = {"time": time_num, "altitude": alt, x_name: x_values, y_name: y_values}
     unfiltered_coordinate_values = {"time": raw_time_num, "altitude": raw_alt, x_name: raw_x, y_name: raw_y}
     precision_source_values = _precision_source_values(
-        selected, valid_event_mask, time=time, time_num=time_num, latitude=lat,
+        project, event_indices, time=time, time_num=time_num, latitude=lat,
         longitude=lon, altitude=alt, east=east, north=north, source_ids=source_ids,
     )
 
@@ -1484,12 +1642,12 @@ def create_intfs_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec
 
     if plot.show_stations:
         if is_local:
-            _plot_stations_local(project, selected, ax_plan, ax_nz, ax_ez, plot.theme,
+            _plot_stations_local(project, project.dataset, ax_plan, ax_nz, ax_ez, plot.theme,
                                  show_labels=plot.show_station_labels,
                                  show_vertical=plot.show_stations_in_vertical_projections,
                                  east_sign=east_sign, north_sign=north_sign)
         else:
-            _plot_stations_geodetic(selected, ax_plan, ax_ez, ax_nz, plot.theme,
+            _plot_stations_geodetic(project.dataset, ax_plan, ax_ez, ax_nz, plot.theme,
                                     show_labels=plot.show_station_labels,
                                     show_vertical=plot.show_stations_in_vertical_projections)
     apply_figure_theme(fig, all_axes, plot.theme, show_grid=plot.show_grid)
@@ -1566,6 +1724,7 @@ def create_intfs_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec
         "map_update_callback": (map_underlay.update if map_underlay is not None else None),
         "depth_mode": plot.depth_mode, "title_artist": title_artist, "title_formatter": title_formatter,
         "preview_point_limit": int(plot.preview_point_limit), "preview_order": preview_order,
+        "preview_indices": np.ascontiguousarray(preview_indices, dtype=np.int64),
         "displayed_count": int(preview_indices.size), "subset_callback": subset_callback,
         "coordinate_system": plot.coordinate_system, "reference_latitude": float(project.reference_latitude), "geometry_version": "landscape-linked-v1.0.0",
     }
@@ -1573,11 +1732,8 @@ def create_intfs_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec
 
 
 def create_xlma_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec, *, for_export: bool = False) -> Figure:
-    selected = project.selected_dataset(filters)
-    if selected.sizes.get("number_of_events", 0) == 0:
-        raise DatasetError("No LMA sources pass the selected filters")
     (time, time_num, source_time_s, lat, lon, alt, east, north, source_ids,
-     colors, color_label, norm, valid_event_mask, categorical_colors, categorical_labels) = _valid_event_arrays(project, selected, plot)
+     colors, color_label, norm, event_indices, categorical_colors, categorical_labels) = _valid_event_arrays(project, filters, plot)
     filtered_count = len(time)
     size = plot.point_size or automatic_point_size(filtered_count)
     if plot.color_by == "charge":
@@ -1596,12 +1752,12 @@ def create_xlma_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec,
         x_values, y_values = lon, lat
         x_name, y_name = "longitude", "latitude"
         x_label, y_label = "Longitude (degrees)", "Latitude (degrees)"
-    raw_time, raw_time_num, raw_lat, raw_lon, raw_alt, raw_east, raw_north, raw_source_ids = _finite_coordinate_arrays(project, project.dataset)
+    raw_time, raw_time_num, raw_lat, raw_lon, raw_alt, raw_east, raw_north, raw_source_ids = _finite_coordinate_arrays(project)
     raw_x, raw_y = (raw_east, raw_north) if is_local else (raw_lon, raw_lat)
     filtered_coordinate_values = {"time": time_num, "altitude": alt, x_name: x_values, y_name: y_values}
     unfiltered_coordinate_values = {"time": raw_time_num, "altitude": raw_alt, x_name: raw_x, y_name: raw_y}
     precision_source_values = _precision_source_values(
-        selected, valid_event_mask, time=time, time_num=time_num, latitude=lat,
+        project, event_indices, time=time, time_num=time_num, latitude=lat,
         longitude=lon, altitude=alt, east=east, north=north, source_ids=source_ids,
     )
 
@@ -1709,11 +1865,11 @@ def create_xlma_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec,
     update_histogram(np.ones(filtered_count, dtype=bool))
     if plot.show_stations:
         if is_local:
-            _plot_stations_local_portrait(project, selected, ax_plan, ax_x_alt, ax_alt_y, plot.theme,
+            _plot_stations_local_portrait(project, project.dataset, ax_plan, ax_x_alt, ax_alt_y, plot.theme,
                                           show_labels=plot.show_station_labels,
                                           show_vertical=plot.show_stations_in_vertical_projections)
         else:
-            _plot_stations_geodetic(selected, ax_plan, ax_x_alt, ax_alt_y, plot.theme,
+            _plot_stations_geodetic(project.dataset, ax_plan, ax_x_alt, ax_alt_y, plot.theme,
                                     show_labels=plot.show_station_labels,
                                     show_vertical=plot.show_stations_in_vertical_projections)
     for index, axis in enumerate(all_axes):
@@ -1818,11 +1974,173 @@ def create_xlma_figure(project: LMAProject, filters: FilterSpec, plot: PlotSpec,
         "map_update_callback": (map_underlay.update if map_underlay is not None else None),
         "title_artist": title_artist, "title_formatter": title_formatter,
         "preview_point_limit": int(plot.preview_point_limit), "preview_order": preview_order,
+        "preview_indices": np.ascontiguousarray(preview_indices, dtype=np.int64),
         "displayed_count": int(preview_indices.size), "coordinate_system": plot.coordinate_system,
         "reference_latitude": float(project.reference_latitude),
         "export_size_inches": (figure_width, 11.0), "for_export": bool(for_export), "geometry_version": "portrait-linked-v1.0.0",
     }
     return fig
+
+
+_IN_PLACE_PLOT_FIELDS = {
+    "point_size",
+    "show_grid",
+    "dpi",
+    "cmap",
+    "reverse_cmap",
+    "preview_point_limit",
+    "title",
+    "show_legend",
+    "show_panel_labels",
+    "show_north_south_title",
+    "show_east_west_title",
+    "auto_fit_spatial",
+    "remap_time_colors",
+    "saved_figure_dpi",
+    "three_d_display_mode",
+    "three_d_trail_ms",
+    "three_d_afterimage_ms",
+    "three_d_playback_fps",
+    "three_d_playback_duration_s",
+    "three_d_hold_end_s",
+    "three_d_orbit_speed_deg_s",
+    "three_d_interaction_mode",
+    "three_d_show_grid_and_labels",
+}
+
+
+def update_lma_figure_in_place(
+    figure: Figure,
+    project: LMAProject,
+    *,
+    filters: FilterSpec,
+    plot: PlotSpec,
+) -> set[str] | None:
+    """Apply inexpensive display-only changes to an existing LMAS figure.
+
+    ``None`` means that the requested change affects data, layout, or geometry
+    and requires a normal figure rebuild.  A returned set contains the PlotSpec
+    fields updated in place.
+    """
+
+    metadata = getattr(figure, "_lmas_metadata", None)
+    if not isinstance(metadata, dict) or not metadata.get("linked_view"):
+        return None
+    old_plot = metadata.get("plot_spec")
+    if not isinstance(old_plot, PlotSpec):
+        return None
+    filters = filters.validated()
+    plot = plot.validated()
+    if dict(metadata.get("filter_spec", {})) != filters.to_dict():
+        return None
+
+    old_values = old_plot.to_dict()
+    new_values = plot.to_dict()
+    changed = {
+        name for name, value in new_values.items()
+        if old_values.get(name) != value
+    }
+    if not changed:
+        return set()
+    if not changed.issubset(_IN_PLACE_PLOT_FIELDS):
+        return None
+    if {"cmap", "reverse_cmap"} & changed and plot.color_by in {"charge", "group"}:
+        return None
+
+    if "point_size" in changed:
+        size = float(plot.point_size) or automatic_point_size(
+            int(metadata.get("filtered_count", metadata.get("source_count", 0)))
+        )
+        for scatter in tuple(metadata.get("scatters", ())):
+            scatter.set_sizes(np.asarray([size], dtype=float))
+
+    if "show_grid" in changed:
+        values = theme_values(plot.theme)
+        axes = dict(metadata.get("axes", {})).values()
+        for axis in dict.fromkeys(axes):
+            if plot.show_grid:
+                axis.grid(
+                    True,
+                    which="major",
+                    linewidth=0.35,
+                    alpha=0.24,
+                    color=values["grid"],
+                )
+            else:
+                axis.grid(False, which="major")
+
+    if {"cmap", "reverse_cmap"} & changed:
+        cmap = resolved_cmap(plot.cmap, reverse=plot.reverse_cmap)
+        for scatter in tuple(metadata.get("scatters", ())):
+            scatter.set_cmap(cmap)
+        colorbar = metadata.get("colorbar")
+        if colorbar is not None and metadata.get("scatters"):
+            colorbar.update_normal(metadata["scatters"][0])
+            callback = metadata.get("colorbar_update_callback")
+            if callable(callback):
+                callback()
+
+    if "dpi" in changed:
+        figure.set_dpi(int(plot.dpi))
+
+    if "title" in changed:
+        title_formatter = _view_title(project, filters, plot)
+        if metadata.get("layout") == "xlma":
+            title_formatter = _stacked_title(title_formatter)
+        metadata["title_formatter"] = title_formatter
+
+    if "show_legend" in changed:
+        refresh_figure_legend(
+            figure,
+            tuple(dict(metadata.get("axes", {})).values()),
+            plot,
+        )
+
+    if "show_panel_labels" in changed:
+        _refresh_panel_labels(figure, metadata, plot)
+
+    if metadata.get("layout") == "intfs" and metadata.get("coordinate_system") == "local":
+        axes = dict(metadata.get("axes", {}))
+        if "show_east_west_title" in changed:
+            axis = axes.get("north_altitude")
+            if axis is not None:
+                axis.set_title(
+                    f"View from {plot.east_west_viewpoint.title()}"
+                    if plot.show_east_west_title
+                    else ""
+                )
+        if "show_north_south_title" in changed:
+            axis = axes.get("east_altitude")
+            if axis is not None:
+                axis.set_title(
+                    f"View from {plot.north_south_viewpoint.title()}"
+                    if plot.show_north_south_title
+                    else ""
+                )
+
+    metadata["preview_point_limit"] = int(plot.preview_point_limit)
+    metadata["auto_fit_spatial"] = bool(plot.auto_fit_spatial)
+    metadata["remap_time_colors"] = bool(plot.remap_time_colors)
+    metadata["remap_colormap"] = bool(
+        plot.remap_time_colors and plot.color_by not in {"charge", "group"}
+    )
+    metadata["plot_spec"] = plot
+
+    title_artist = metadata.get("title_artist")
+    title_formatter = metadata.get("title_formatter")
+    if title_artist is not None and callable(title_formatter):
+        visible = int(
+            metadata.get("visible_in_view_count", metadata.get("filtered_count", 0))
+        )
+        in_view = int(
+            metadata.get("unfiltered_in_view_count", metadata.get("loaded_count", visible))
+        )
+        displayed = int(metadata.get("displayed_count", visible))
+        try:
+            title_artist.set_text(title_formatter(visible, in_view, displayed))
+        except TypeError:
+            title_artist.set_text(title_formatter(visible, in_view))
+    return changed
 
 def create_lma_figure(
     project: LMAProject,
@@ -1838,4 +2156,4 @@ def create_lma_figure(
     return create_xlma_figure(project, filter_spec, plot_spec, for_export=for_export)
 
 
-__all__ = ["create_lma_figure", "create_intfs_figure", "create_xlma_figure", "save_figure"]
+__all__ = ["create_lma_figure", "create_intfs_figure", "create_xlma_figure", "save_figure", "update_lma_figure_in_place"]

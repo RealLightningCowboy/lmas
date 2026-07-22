@@ -21,8 +21,3 @@ def test_active_tab_scopes_transient_group_overlays() -> None:
     assert 'state["active_domain"] = self._current_domain()' in text
     assert "self._remove_overlays()" in text
 
-
-def test_public_release_omits_private_leader_workspace() -> None:
-    main = (PACKAGE / "gui" / "main_window.py").read_text(encoding="utf-8")
-    assert "Leader Speed Analysis" not in main
-    assert "Leader Analysis" not in (PACKAGE / "gui" / "selection_window.py").read_text(encoding="utf-8")

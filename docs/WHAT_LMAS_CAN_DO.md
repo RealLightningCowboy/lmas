@@ -1,6 +1,6 @@
 # What LMAS can do
 
-LMAS 1.6.1 is an end-to-end environment for already solved Lightning Mapping Array source products and linked observational overlays.
+LMAS 1.6.2 is an end-to-end environment for already solved Lightning Mapping Array source products and linked observational overlays.
 
 ## Data and projects
 

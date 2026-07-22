@@ -1,4 +1,4 @@
-# LMAS 1.6.1 command-line reference
+# LMAS 1.6.2 command-line reference
 
 Run `lma --help` for the installed command tree. The aliases `lmas`, `lma-gui`, and `lmas-gui` are also installed.
 
@@ -45,7 +45,7 @@ lma animate-projection file.dat.gz --output projection.mp4
 lma animate-3d file.dat.gz --output sources.mp4
 ```
 
-Optional visualization dependencies are required for 3D output.
+Optional visualization dependencies are required for 3D output. Interactive `view-projections` and `view-3d` commands accept `--point-limit`; zero disables the interactive cap. Saved animations remain uncapped.
 
 ## Launcher installation
 

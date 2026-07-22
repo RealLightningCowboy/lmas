@@ -19,6 +19,7 @@ from ..source_selection import (
     group_values_for_source_ids,
 )
 from ..source_store import LmaSourceStore
+from .animation import animation_window_bounds_utc
 
 SNAPSHOT_FORMAT = "lmas-3d-snapshot-v1"
 
@@ -42,6 +43,8 @@ class VisualizationSnapshot:
     ground_subtraction_applied: bool = False
     categorical_colors: tuple[str, ...] = ()
     categorical_labels: tuple[str, ...] = ()
+    animation_start_ms: float | None = None
+    animation_end_ms: float | None = None
 
     @property
     def source_count(self) -> int:
@@ -49,6 +52,24 @@ class VisualizationSnapshot:
 
     @property
     def time_limits(self) -> tuple[float, float]:
+        if self.time_ms.size == 0:
+            raise DatasetError("The 3D visualization snapshot contains no sources")
+        start = (
+            float(self.time_ms[0])
+            if self.animation_start_ms is None
+            else float(self.animation_start_ms)
+        )
+        end = (
+            float(self.time_ms[-1])
+            if self.animation_end_ms is None
+            else float(self.animation_end_ms)
+        )
+        if not np.isfinite(start) or not np.isfinite(end) or end < start:
+            raise DatasetError("The 3D visualization snapshot has invalid animation limits")
+        return start, end
+
+    @property
+    def source_time_limits(self) -> tuple[float, float]:
         if self.time_ms.size == 0:
             raise DatasetError("The 3D visualization snapshot contains no sources")
         return float(self.time_ms[0]), float(self.time_ms[-1])
@@ -183,8 +204,18 @@ def build_visualization_snapshot(
     altitude = altitude[order]
     source_ids = source_ids[order]
 
-    first_time = time_utc[0]
-    time_ms = np.asarray((time_utc - first_time) / np.timedelta64(1, "ms"), dtype=float)
+    window_start_utc, window_end_utc = animation_window_bounds_utc(
+        time_utc,
+        start_time=filters.start_time,
+        end_time=filters.end_time,
+    )
+    time_ms = np.asarray(
+        (time_utc - window_start_utc) / np.timedelta64(1, "ms"), dtype=float
+    )
+    animation_start_ms = 0.0
+    animation_end_ms = float(
+        (window_end_utc - window_start_utc) / np.timedelta64(1, "ms")
+    )
     display_colors, color_label, categorical_colors, categorical_labels = _snapshot_color_values(
         selected, plot, time_ms, project
     )
@@ -204,7 +235,9 @@ def build_visualization_snapshot(
         raise DatasetError("No sources remain for the selected 3D color quantity")
 
     points = np.column_stack((east, north, altitude)).astype(float, copy=False)
-    timestamp = np.datetime_as_string(time_utc[0], unit="ms").replace("T", " ") + " UTC"
+    timestamp = (
+        np.datetime_as_string(window_start_utc, unit="ms").replace("T", " ") + " UTC"
+    )
     title = str(plot.title or project.data_source_stem)
     destination = (
         Path(output_path).expanduser().resolve()
@@ -225,6 +258,12 @@ def build_visualization_snapshot(
         "ground_subtraction_applied": False,
         "categorical_colors": list(categorical_colors),
         "categorical_labels": list(categorical_labels),
+        "animation_start_ms": animation_start_ms,
+        "animation_end_ms": animation_end_ms,
+        "animation_window_start_utc": np.datetime_as_string(
+            window_start_utc, unit="ns"
+        ),
+        "animation_window_end_utc": np.datetime_as_string(window_end_utc, unit="ns"),
     }
     with destination.open("wb") as stream:
         np.savez_compressed(
@@ -280,6 +319,16 @@ def load_visualization_snapshot(path: str | Path) -> VisualizationSnapshot:
         ground_subtraction_applied=bool(metadata.get("ground_subtraction_applied", False)),
         categorical_colors=tuple(str(value) for value in metadata.get("categorical_colors") or ()),
         categorical_labels=tuple(str(value) for value in metadata.get("categorical_labels") or ()),
+        animation_start_ms=(
+            None
+            if metadata.get("animation_start_ms") is None
+            else float(metadata["animation_start_ms"])
+        ),
+        animation_end_ms=(
+            None
+            if metadata.get("animation_end_ms") is None
+            else float(metadata["animation_end_ms"])
+        ),
     )
 
 

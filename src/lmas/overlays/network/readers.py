@@ -7,7 +7,6 @@ import re
 from typing import Iterable, Mapping, Sequence
 
 import numpy as np
-import pandas as pd
 
 from .model import NAT_NS, NetworkEvents, NetworkIdentity, NetworkObservation, NetworkSourceFile
 
@@ -118,6 +117,8 @@ def _resolve_columns(columns: Sequence[object], explicit: Mapping[str, str] | No
 
 
 def _numeric(frame: pd.DataFrame, column: str | None, *, default: float = np.nan) -> np.ndarray:
+    import pandas as pd
+
     if column is None:
         return np.full(len(frame), default, dtype=float)
     return pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype=float)
@@ -158,6 +159,8 @@ def _display_name(provider: str, requested: str | None) -> str:
 
 
 def _parse_times(frame: pd.DataFrame, columns: Mapping[str, str], fmt: str | None) -> np.ndarray:
+    import pandas as pd
+
     # A surprising number of network exports call the clock-only column simply
     # ``time``. Prefer the explicit date+clock pair when both are present, then
     # fall back to one complete timestamp column.
@@ -260,6 +263,8 @@ def read_network_csv(
     *,
     options: NetworkCSVOptions | None = None,
 ) -> NetworkObservation:
+    import pandas as pd
+
     options = options or NetworkCSVOptions()
     if isinstance(paths, (str, Path)):
         source_paths = [Path(paths).expanduser().resolve()]
@@ -384,6 +389,8 @@ def read_network_csv(
 
 def write_generic_network_example(path: str | Path, *, center_time: str = "2019-04-30T14:49:14.265") -> Path:
     """Write a small redistribution-safe CSV used by docs and tests."""
+    import pandas as pd
+
     destination = Path(path).expanduser().resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
     center = np.datetime64(center_time, "ns")

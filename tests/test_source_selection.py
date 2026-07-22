@@ -35,8 +35,8 @@ def test_locked_group_cannot_be_edited():
 def test_named_groups_preserve_source_identity():
     manager = SourceSelectionManager()
     manager.apply([2, 5], "replace")
-    second = manager.new_group("Leader", source_ids=[7, 8])
-    assert second.name == "Leader"
+    second = manager.new_group("Second group", source_ids=[7, 8])
+    assert second.name == "Second group"
     assert manager.set_active("Selection 1")
     assert manager.active_group.source_ids == frozenset({2, 5})
     renamed = manager.rename_group("Charge region")

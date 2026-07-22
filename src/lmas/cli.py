@@ -6,21 +6,12 @@ from pathlib import Path
 import sys
 
 from . import __version__
-from .demo import demo_project
 from .errors import LMASError
-from .io.project import load_project, save_project
-from .io.backends import READER_CHOICES, reader_backend_statuses
-from .io.readers import load_lma_files
-from .model import FilterSpec, PlotSpec
-from .plotting import create_lma_figure, save_figure
-from .polarity_product import (
-    EXPORT_SCOPES,
-    export_polarity_csv,
-    export_polarity_netcdf,
-    import_polarity_netcdf,
-)
-from .profiles import ProfileStore
-from .summary import project_summary
+
+# Parser-only constants stay local so launching ``lma gui`` does not import the
+# scientific, plotting, product-export, and profile stacks before dispatch.
+EXPORT_SCOPES = ("all", "filtered", "assigned", "active_group")
+
 
 
 def _add_filter_arguments(parser: argparse.ArgumentParser) -> None:
@@ -38,7 +29,9 @@ def _add_filter_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-y-km", type=float)
 
 
-def _filters(args) -> FilterSpec:
+def _filters(args):
+    from .model import FilterSpec
+
     return FilterSpec(
         start_time=getattr(args, "start_time", None),
         end_time=getattr(args, "end_time", None),
@@ -56,6 +49,10 @@ def _filters(args) -> FilterSpec:
 
 
 def _project_from_args(args):
+    from .demo import demo_project
+    from .io.project import load_project
+    from .io.readers import load_lma_files
+
     if getattr(args, "project", None):
         return load_project(args.project, reader_backend=getattr(args, "reader", "auto"))
     files = getattr(args, "files", None) or []
@@ -70,11 +67,16 @@ def _project_from_args(args):
 
 
 def command_inspect(args) -> int:
+    from .summary import project_summary
+
     print(json.dumps(project_summary(_project_from_args(args)), indent=2))
     return 0
 
 
 def command_plot(args) -> int:
+    from .model import PlotSpec
+    from .plotting import create_lma_figure, save_figure
+
     project = _project_from_args(args)
     filters = _filters(args)
     plot = PlotSpec(
@@ -108,6 +110,10 @@ def command_plot(args) -> int:
 
 
 def command_project(args) -> int:
+    from .io.project import save_project
+    from .io.readers import load_lma_files
+    from .model import PlotSpec
+
     project = load_lma_files(
         args.files,
         name=args.name,
@@ -159,6 +165,9 @@ def command_gui(args) -> int:
 
 
 def command_export_polarity(args) -> int:
+    from .io.project import load_project
+    from .polarity_product import export_polarity_csv, export_polarity_netcdf
+
     project = load_project(args.project, reader_backend=getattr(args, "reader", "auto"))
     if args.format == "csv":
         destination = export_polarity_csv(
@@ -173,6 +182,9 @@ def command_export_polarity(args) -> int:
 
 
 def command_import_polarity(args) -> int:
+    from .io.project import load_project, save_project
+    from .polarity_product import import_polarity_netcdf
+
     project = load_project(args.project, reader_backend=getattr(args, "reader", "auto"))
     project.source_selection_state = import_polarity_netcdf(
         project, args.polarity, allow_partial=bool(args.allow_partial)
@@ -182,6 +194,8 @@ def command_import_polarity(args) -> int:
 
 
 def command_readers(args) -> int:
+    from .io.backends import reader_backend_statuses
+
     payload = [
         {
             "name": status.name,
@@ -197,6 +211,8 @@ def command_readers(args) -> int:
 
 
 def command_profiles(args) -> int:
+    from .profiles import ProfileStore
+
     store = ProfileStore()
     if args.profile_command == "list":
         for profile in store.list():
@@ -219,6 +235,7 @@ def command_profiles(args) -> int:
 
 
 def command_snapshot_3d(args) -> int:
+    from .model import PlotSpec
     from .visualization.snapshot import build_visualization_snapshot
 
     project = _project_from_args(args)
@@ -259,6 +276,7 @@ def command_view_3d(args) -> int:
         camera_output=args.camera_output,
         playback_fps=args.fps,
         playback_duration_s=args.duration_s,
+        point_limit=args.point_limit,
         start_playing=args.play,
         show_grid_and_labels=not args.hide_axes,
         window_size=(args.width, args.height),
@@ -310,6 +328,7 @@ def command_batch_figures(args) -> int:
 
 def command_view_projections(args) -> int:
     from .gui.projection_animation_viewer import run_projection_animation_viewer
+    from .io.project import load_project
 
     project = load_project(args.project)
     return run_projection_animation_viewer(
@@ -319,10 +338,12 @@ def command_view_projections(args) -> int:
         afterimage_ms=args.afterimage_ms,
         fps=args.fps,
         duration_s=args.duration_s,
+        point_limit=args.point_limit,
     )
 
 
 def command_animate_projections(args) -> int:
+    from .io.project import load_project
     from .visualization.projection_animation import animate_projection_project
 
     project = load_project(args.project)
@@ -516,6 +537,12 @@ def build_parser() -> argparse.ArgumentParser:
     _add_3d_display_arguments(view3d)
     view3d.add_argument("--fps", type=float, default=30.0, help="Interactive playback refresh rate")
     view3d.add_argument("--duration-s", type=float, default=15.0, help="Development playback duration")
+    view3d.add_argument(
+        "--point-limit",
+        type=int,
+        default=50_000,
+        help="Maximum sources rendered interactively; zero disables the cap",
+    )
     view3d.add_argument("--interaction-mode", choices=("z-orbit", "full-3d"), default="z-orbit")
     view3d.add_argument("--play", action="store_true")
     view3d.set_defaults(func=command_view_3d)
@@ -546,6 +573,12 @@ def build_parser() -> argparse.ArgumentParser:
     view2d.add_argument("--afterimage-ms", type=float, default=30.0)
     view2d.add_argument("--fps", type=int, default=30)
     view2d.add_argument("--duration-s", type=float, default=15.0)
+    view2d.add_argument(
+        "--point-limit",
+        type=int,
+        default=50_000,
+        help="Maximum sources rendered interactively; zero disables the cap",
+    )
     view2d.set_defaults(func=command_view_projections)
 
     animate2d = sub.add_parser(

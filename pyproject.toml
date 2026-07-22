@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lmas"
-version = "1.6.1"
+version = "1.6.2"
 description = "Lightning Mapping Array Suite: modular viewing and analysis tools for solved LMA source data"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -53,9 +53,9 @@ all = [
 ]
 
 [project.scripts]
-lma = "lmas.cli:main"
+lma = "lmas.entrypoint:main"
 lma-gui = "lmas.gui.app:main"
-lmas = "lmas.cli:main"
+lmas = "lmas.entrypoint:main"
 lmas-gui = "lmas.gui.app:main"
 lmas-install-launcher = "lmas.launcher:main"
 

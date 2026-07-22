@@ -385,6 +385,10 @@ class LMAProject:
             self.dataset, event_dimension=EVENT_DIM
         )
         self._source_store_signature = _dataset_store_signature(self.dataset)
+        # Plot preparation caches are keyed to the immutable source store.  A
+        # deliberate xarray reassignment therefore invalidates them together.
+        self.__dict__.pop("_selected_dataset_cache", None)
+        self.__dict__.pop("_lmas_plot_event_array_cache", None)
         return self._source_store
 
     @property
@@ -448,7 +452,22 @@ class LMAProject:
         return select_event_store(self, filters or self.filters)
 
     def selected_dataset(self, filters: FilterSpec | None = None) -> xr.Dataset:
-        return self.selected_source_store(filters).to_xarray()
+        # Figure option changes commonly reuse the exact same scientific
+        # filter.  Re-selecting every aligned variable and rebuilding an
+        # xarray Dataset for each cosmetic redraw was a substantial avoidable
+        # cost on ordinary laptops.  Keep one immutable-store-backed selection
+        # hot; a filter or source-store change replaces it automatically.
+        spec = (filters or self.filters).validated()
+        key = (
+            id(self.source_store),
+            tuple(spec.to_dict().items()),
+        )
+        cached = self.__dict__.get("_selected_dataset_cache")
+        if isinstance(cached, tuple) and len(cached) == 2 and cached[0] == key:
+            return cached[1]
+        selected = self.selected_source_store(spec).to_xarray()
+        self.__dict__["_selected_dataset_cache"] = (key, selected)
+        return selected
 
     def polarity_dataframe(self, *, scope: str = "all"):
         """Return the canonical one-row-per-source manual-polarity table."""

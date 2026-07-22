@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 import gc
 from pathlib import Path
 from typing import Literal
@@ -15,17 +13,22 @@ import numpy as np
 from ..errors import ConfigurationError, DatasetError
 from ..model import FilterSpec, LMAProject
 from ..plotting import create_lma_figure
-from .animation import AnimationProgressReporter, animation_frame_times
+from .animation import (
+    AnimationProgressReporter,
+    animation_frame_times,
+    animation_window_bounds_utc,
+)
 from .pyvista_3d import frame_display_rgba
 
 DisplayMode = Literal["cumulative", "trail", "trail-afterimage"]
 _DISPLAY_MODES = {"cumulative", "trail", "trail-afterimage"}
 
 
-def combined_project_filter(project: LMAProject) -> FilterSpec:
-    """Combine quality filtering with the non-destructive saved linked view."""
-    quality = project.filters.validated()
-    view = project.view_filters.validated()
+def combined_filter_spec(quality: FilterSpec, view: FilterSpec) -> FilterSpec:
+    """Combine scientific-quality criteria with a non-destructive linked view."""
+
+    quality = quality.validated()
+    view = view.validated()
     return FilterSpec(
         start_time=view.start_time,
         end_time=view.end_time,
@@ -40,6 +43,12 @@ def combined_project_filter(project: LMAProject) -> FilterSpec:
         minimum_y_km=view.minimum_y_km,
         maximum_y_km=view.maximum_y_km,
     ).validated()
+
+
+def combined_project_filter(project: LMAProject) -> FilterSpec:
+    """Combine a Project's quality filtering with its saved linked view."""
+
+    return combined_filter_spec(project.filters, project.view_filters)
 
 
 def _apply_saved_view(figure, project: LMAProject) -> None:
@@ -89,14 +98,109 @@ class ProjectionAnimationScene:
     chi2_suffix: str
     cmap: str | None
     reverse_cmap: bool
+    total_source_count: int
+    animation_start_ms: float
+    animation_end_ms: float
+    preserve_depth_order: bool = True
+    _offsets: list[np.ndarray] = field(default_factory=list, init=False, repr=False)
+    _depth_orders: list[np.ndarray | None] = field(
+        default_factory=list, init=False, repr=False
+    )
+    _rgba_buffer: np.ndarray = field(init=False, repr=False)
+    _facecolor_buffer: np.ndarray = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self.colors = np.ascontiguousarray(self.colors, dtype=float)
+        self.time_ms = np.ascontiguousarray(self.time_ms, dtype=float)
+        self.base_rgba = np.ascontiguousarray(self.base_rgba, dtype=np.uint8)
+        self.animation_start_ms = float(self.animation_start_ms)
+        self.animation_end_ms = float(self.animation_end_ms)
+        if (
+            not np.isfinite(self.animation_start_ms)
+            or not np.isfinite(self.animation_end_ms)
+            or self.animation_end_ms < self.animation_start_ms
+        ):
+            raise DatasetError("Projection animation window limits are invalid")
+        count = int(self.colors.size)
+        if self.time_ms.shape != (count,) or self.base_rgba.shape != (count, 4):
+            raise DatasetError("Projection animation arrays are inconsistent")
+        self._rgba_buffer = np.empty_like(self.base_rgba)
+        self._facecolor_buffer = np.empty((count, 4), dtype=np.float32)
+
+        self._offsets = []
+        for pair in self.coordinate_pairs:
+            x_values = np.asarray(pair[0], dtype=float)
+            y_values = np.asarray(pair[1], dtype=float)
+            if x_values.shape != (count,) or y_values.shape != (count,):
+                raise DatasetError("Projection animation coordinates are inconsistent")
+            offsets = np.empty((count, 2), dtype=float)
+            offsets[:, 0] = x_values
+            offsets[:, 1] = y_values
+            self._offsets.append(np.ascontiguousarray(offsets))
+
+        self._depth_orders = []
+        for index in range(len(self.scatters)):
+            key = self.depth_keys[index] if index < len(self.depth_keys) else None
+            if not self.preserve_depth_order or key is None:
+                self._depth_orders.append(None)
+                continue
+            values = np.asarray(key, dtype=float)
+            if values.shape != (count,):
+                self._depth_orders.append(None)
+                continue
+            self._depth_orders.append(
+                np.asarray(np.argsort(values, kind="stable"), dtype=np.int64)
+            )
 
     @property
     def first_time_ms(self) -> float:
-        return float(np.nanmin(self.time_ms))
+        """Beginning of the selected animation window in scene-relative ms."""
+
+        return self.animation_start_ms
 
     @property
     def final_time_ms(self) -> float:
-        return float(np.nanmax(self.time_ms))
+        """End of the selected animation window in scene-relative ms."""
+
+        return self.animation_end_ms
+
+    @property
+    def first_source_time_ms(self) -> float:
+        return float(self.time_ms[0])
+
+    @property
+    def final_source_time_ms(self) -> float:
+        return float(self.time_ms[-1])
+
+    @property
+    def displayed_source_count(self) -> int:
+        return int(self.colors.size)
+
+    @property
+    def dynamic_artists(self) -> tuple:
+        artists = list(self.scatters)
+        if self.title_artist is not None:
+            artists.append(self.title_artist)
+        return tuple(artists)
+
+    def _visible_bounds(
+        self,
+        current_time_ms: float,
+        *,
+        display_mode: DisplayMode,
+        trail_ms: float,
+    ) -> tuple[int, int]:
+        current = float(current_time_ms)
+        end = int(np.searchsorted(self.time_ms, current, side="right"))
+        if display_mode == "trail":
+            if trail_ms <= 0:
+                raise ConfigurationError("Trail duration must be positive")
+            start = int(
+                np.searchsorted(self.time_ms, current - float(trail_ms), side="left")
+            )
+        else:
+            start = 0
+        return max(0, min(start, end)), max(0, min(end, self.time_ms.size))
 
     def update(
         self,
@@ -105,58 +209,76 @@ class ProjectionAnimationScene:
         display_mode: DisplayMode,
         trail_ms: float,
         afterimage_ms: float,
+        update_title: bool = True,
     ) -> int:
         if display_mode not in _DISPLAY_MODES:
             raise ConfigurationError(
                 f"Unknown projection-animation display mode: {display_mode}"
             )
-        rgba = frame_display_rgba(
-            self.base_rgba,
-            self.time_ms,
-            float(current_time_ms),
+        start, end = self._visible_bounds(
+            current_time_ms,
             display_mode=display_mode,
             trail_ms=trail_ms,
-            afterimage_ms=afterimage_ms,
-            cmap=self.cmap,
-            reverse_cmap=self.reverse_cmap,
         )
-        visible = rgba[:, 3] > 0
-        base_selected = np.flatnonzero(visible)
-        for index, (scatter, pair) in enumerate(
-            zip(self.scatters, self.coordinate_pairs)
-        ):
-            selected = base_selected
-            key = (
-                np.asarray(self.depth_keys[index], dtype=float)
-                if index < len(self.depth_keys)
-                else None
+        if end > start:
+            rgba = frame_display_rgba(
+                self.base_rgba[start:end],
+                self.time_ms[start:end],
+                float(current_time_ms),
+                display_mode=display_mode,
+                trail_ms=trail_ms,
+                afterimage_ms=afterimage_ms,
+                cmap=self.cmap,
+                reverse_cmap=self.reverse_cmap,
+                out=self._rgba_buffer[start:end],
             )
-            if key is not None and key.shape == (self.colors.size,) and selected.size:
-                selected = selected[np.argsort(key[selected], kind="stable")]
-            if selected.size:
-                offsets = np.column_stack(
-                    (np.asarray(pair[0])[selected], np.asarray(pair[1])[selected])
-                )
-                facecolors = rgba[selected].astype(float) / 255.0
+            facecolors = self._facecolor_buffer[start:end]
+            np.multiply(
+                rgba,
+                np.float32(1.0 / 255.0),
+                out=facecolors,
+                casting="unsafe",
+            )
+            visible_count = int(np.count_nonzero(rgba[:, 3]))
+        else:
+            rgba = self._rgba_buffer[:0]
+            facecolors = self._facecolor_buffer[:0]
+            visible_count = 0
+
+        for index, scatter in enumerate(self.scatters):
+            order = self._depth_orders[index] if index < len(self._depth_orders) else None
+            if end <= start:
+                offsets = self._offsets[index][:0]
+                panel_colors = facecolors
+            elif order is None:
+                offsets = self._offsets[index][start:end]
+                panel_colors = facecolors
             else:
-                offsets = np.empty((0, 2), dtype=float)
-                facecolors = np.empty((0, 4), dtype=float)
+                selected = order[(order >= start) & (order < end)]
+                offsets = self._offsets[index][selected]
+                panel_colors = facecolors[selected - start]
             scatter.set_offsets(offsets)
-            scatter.set_facecolors(facecolors)
-        visible_count = int(np.count_nonzero(visible))
-        if self.title_artist is not None:
+            scatter.set_facecolors(panel_colors)
+
+        if update_title and self.title_artist is not None:
+            displayed = self.displayed_source_count
+            total = max(displayed, int(self.total_source_count))
+            if displayed < total:
+                population = (
+                    f"{visible_count:,} visible of {displayed:,} displayed; "
+                    f"{total:,} sources in view"
+                )
+            else:
+                population = f"{visible_count:,} visible of {total:,} sources in view"
             self.title_artist.set_text(
-                f"{self.base_title} — {visible_count:,} visible of "
-                f"{self.colors.size:,} sources in view{self.chi2_suffix}\n"
+                f"{self.base_title} — {population}{self.chi2_suffix}\n"
                 f"Source time: {float(current_time_ms):.3f} ms"
             )
         return visible_count
 
     def close(self) -> None:
-        # The animation worker is deliberately headless. Explicitly disconnect
-        # and clear the large Matplotlib object graph so Qt/Matplotlib backend
-        # state cannot keep a completed Windows worker alive at interpreter
-        # shutdown.
+        # Explicitly clear the large Matplotlib object graph so completed GUI and
+        # headless workers do not retain source arrays at interpreter shutdown.
         try:
             self.figure.clear()
         except Exception:
@@ -164,6 +286,56 @@ class ProjectionAnimationScene:
         self.scatters.clear()
         self.coordinate_pairs.clear()
         self.depth_keys.clear()
+        self._offsets.clear()
+        self._depth_orders.clear()
+        self._rgba_buffer = np.empty((0, 4), dtype=np.uint8)
+        self._facecolor_buffer = np.empty((0, 4), dtype=np.float32)
+
+
+def _subset_animation_arrays(
+    indices: np.ndarray,
+    coordinate_pairs: list,
+    depth_keys: list,
+    colors: np.ndarray,
+    time_utc: np.ndarray,
+) -> tuple[list, list, np.ndarray, np.ndarray]:
+    take = np.asarray(indices, dtype=np.int64)
+    coordinate_pairs = [
+        (np.asarray(pair[0])[take], np.asarray(pair[1])[take])
+        for pair in coordinate_pairs
+    ]
+    depth_keys = [
+        None if key is None else np.asarray(key)[take]
+        for key in depth_keys
+    ]
+    return coordinate_pairs, depth_keys, np.asarray(colors)[take], np.asarray(time_utc)[take]
+
+
+def _animation_time_values(metadata: dict, coordinate_pairs: list, count: int) -> np.ndarray:
+    scope = dict(metadata.get("selection_scopes", {})).get("filtered", {})
+    values = np.asarray(scope.get("time", ()))
+    if values.shape == (int(count),):
+        return values.astype("datetime64[us]")
+
+    time_numbers = np.asarray(coordinate_pairs[0][0], dtype=float)
+    return np.asarray(
+        [
+            np.datetime64(value.replace(tzinfo=None), "us")
+            for value in mdates.num2date(time_numbers)
+        ]
+    )
+
+
+def _time_stratified_indices(time_utc: np.ndarray, limit: int) -> np.ndarray:
+    count = int(np.asarray(time_utc).size)
+    limit = int(limit)
+    if count <= 0:
+        return np.empty(0, dtype=np.int64)
+    order = np.argsort(np.asarray(time_utc).astype("datetime64[ns]").astype(np.int64), kind="stable")
+    if limit <= 0 or count <= limit:
+        return np.asarray(order, dtype=np.int64)
+    positions = np.linspace(0, count - 1, limit, dtype=np.int64)
+    return np.asarray(order[positions], dtype=np.int64)
 
 
 def build_projection_animation_scene(
@@ -172,11 +344,24 @@ def build_projection_animation_scene(
     width: int | None = None,
     height: int | None = None,
     custom_title: str | None = None,
+    interactive: bool = False,
+    point_limit: int | None = None,
+    preserve_depth_order: bool | None = None,
 ) -> ProjectionAnimationScene:
     filters = combined_project_filter(project)
     plot = project.plot.validated()
+    if point_limit is None:
+        resolved_limit = int(plot.preview_point_limit) if interactive else 0
+        # A disabled main-view cap should not accidentally send millions of
+        # sources into an interactive animation on an ordinary machine.
+        if interactive and resolved_limit <= 0:
+            resolved_limit = 50_000
+    else:
+        resolved_limit = max(0, int(point_limit))
     figure = create_lma_figure(
-        project, filters=filters, plot=replace(plot, preview_point_limit=0)
+        project,
+        filters=filters,
+        plot=replace(plot, preview_point_limit=resolved_limit),
     )
     metadata = getattr(figure, "_lmas_metadata", {})
     scatters = list(metadata.get("scatters", ()))
@@ -186,25 +371,47 @@ def build_projection_animation_scene(
     if not scatters or len(scatters) != len(coordinate_pairs) or colors.size == 0:
         raise DatasetError("The LMAS figure does not expose an animatable projection layout")
 
+    time_utc = _animation_time_values(metadata, coordinate_pairs, colors.size)
+    source_ids = np.asarray(metadata.get("source_ids", ()), dtype=np.int64)
+
     # Projects may store exact source membership in addition to rectangular
     # time/spatial bounds. Projection animations use that same membership.
-    if project.selected_source_ids is not None:
-        source_ids = np.asarray(metadata.get("source_ids", ()), dtype=np.int64)
-        if source_ids.shape == colors.shape:
-            membership = np.isin(
-                source_ids, np.asarray(project.selected_source_ids, dtype=np.int64)
-            )
-            coordinate_pairs = [
-                (np.asarray(pair[0])[membership], np.asarray(pair[1])[membership])
-                for pair in coordinate_pairs
-            ]
-            depth_keys = [
-                None if key is None else np.asarray(key)[membership]
-                for key in depth_keys
-            ]
-            colors = colors[membership]
-            if colors.size == 0:
-                raise DatasetError("The saved project subset contains no matching sources")
+    if project.selected_source_ids is not None and source_ids.shape == colors.shape:
+        membership = np.isin(
+            source_ids, np.asarray(project.selected_source_ids, dtype=np.int64)
+        )
+        selected = np.flatnonzero(membership)
+        coordinate_pairs, depth_keys, colors, time_utc = _subset_animation_arrays(
+            selected, coordinate_pairs, depth_keys, colors, time_utc
+        )
+        if colors.size == 0:
+            raise DatasetError("The saved project subset contains no matching sources")
+
+    finite_time = ~np.isnat(np.asarray(time_utc).astype("datetime64[ns]"))
+    if not np.all(finite_time):
+        selected = np.flatnonzero(finite_time)
+        coordinate_pairs, depth_keys, colors, time_utc = _subset_animation_arrays(
+            selected, coordinate_pairs, depth_keys, colors, time_utc
+        )
+    if colors.size == 0:
+        raise DatasetError("Projection animation has no finite source times")
+
+    total_source_count = int(colors.size)
+    sample_order = _time_stratified_indices(time_utc, resolved_limit)
+    coordinate_pairs, depth_keys, colors, time_utc = _subset_animation_arrays(
+        sample_order, coordinate_pairs, depth_keys, colors, time_utc
+    )
+
+    # All animation updates can now use two binary searches and contiguous time
+    # slices.  Spatial painter order, when requested for saved products, is
+    # calculated once below rather than re-sorted on every frame.
+    time_order = np.argsort(
+        np.asarray(time_utc).astype("datetime64[ns]").astype(np.int64),
+        kind="stable",
+    )
+    coordinate_pairs, depth_keys, colors, time_utc = _subset_animation_arrays(
+        time_order, coordinate_pairs, depth_keys, colors, time_utc
+    )
 
     _apply_saved_view(figure, project)
     dpi = max(72, int(plot.dpi))
@@ -218,27 +425,26 @@ def build_projection_animation_scene(
             forward=True,
         )
 
-    time_numbers = np.asarray(coordinate_pairs[0][0], dtype=float)
-    time_utc = np.asarray(
-        [
-            np.datetime64(value.replace(tzinfo=None), "us")
-            for value in mdates.num2date(time_numbers)
-        ]
+    window_start_utc, window_end_utc = animation_window_bounds_utc(
+        time_utc,
+        start_time=filters.start_time,
+        end_time=filters.end_time,
     )
-    origin = time_utc.min()
+    origin = np.datetime64(window_start_utc, "us")
     time_ms = np.asarray(
-        (time_utc - origin) / np.timedelta64(1, "ms"), dtype=float
+        (np.asarray(time_utc).astype("datetime64[us]") - origin)
+        / np.timedelta64(1, "ms"),
+        dtype=float,
     )
-    if time_ms.size == 0 or not np.any(np.isfinite(time_ms)):
-        raise DatasetError("Projection animation has no finite source times")
+    animation_start_ms = 0.0
+    animation_end_ms = float(
+        (np.datetime64(window_end_utc, "us") - origin) / np.timedelta64(1, "ms")
+    )
 
     if plot.color_by == "time":
         # Projection development is a self-contained view of the selected
-        # flash. Color the entire animated source population from its first
-        # source (0 s) through its final source, matching the established LMAS
-        # cumulative-animation behavior. Saved GUI color limits may be relative
-        # to a much earlier full-record origin; applying those limits to this
-        # selected subset collapses every source to the purple end of the map.
+        # flash. Color the animated population from its first source through its
+        # final source, independent of a larger record's saved color limits.
         colors = np.asarray(time_ms / 1000.0, dtype=float)
         finite_colors = colors[np.isfinite(colors)]
         low = float(np.min(finite_colors))
@@ -273,6 +479,7 @@ def build_projection_animation_scene(
         if project.filters.maximum_chi2 is not None
         else ""
     )
+    keep_depth = (not interactive) if preserve_depth_order is None else bool(preserve_depth_order)
     return ProjectionAnimationScene(
         figure=figure,
         scatters=scatters,
@@ -286,6 +493,10 @@ def build_projection_animation_scene(
         chi2_suffix=chi2_suffix,
         cmap=plot.cmap if plot.color_by == "time" else None,
         reverse_cmap=plot.reverse_cmap,
+        total_source_count=total_source_count,
+        animation_start_ms=animation_start_ms,
+        animation_end_ms=animation_end_ms,
+        preserve_depth_order=keep_depth,
     )
 
 
@@ -420,5 +631,6 @@ __all__ = [
     "ProjectionAnimationScene",
     "animate_projection_project",
     "build_projection_animation_scene",
+    "combined_filter_spec",
     "combined_project_filter",
 ]

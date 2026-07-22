@@ -24,37 +24,15 @@ from PySide6.QtWidgets import (
 )
 
 from .. import __version__
-from ..demo import demo_project
 from ..errors import ArchiveMemberSelectionRequired, LMASError
 from ..io.backends import normalize_reader_backend, reader_backend_statuses
-from ..io.project import SourceFileReference, load_project, save_project
-from ..polarity_product import (
-    export_polarity_csv,
-    export_polarity_netcdf,
-    import_polarity_netcdf,
-)
-from ..source_selection import refresh_charge_source_colors
-from ..io.readers import load_lma_files
 from ..model import LMAProject
-from ..figure_export import (
-    default_custom_title,
-    save_exact_view,
-    save_theme_variants,
-    theme_variant_paths,
-)
-from ..figure_batch import FigureBatchManifest, write_figure_batch_manifest
-from ..animation_batch import (
-    AnimationBatchManifest,
-    projection_batch_jobs,
-    three_d_batch_jobs,
-    write_batch_manifest,
-)
 from ..output_naming import default_output_path, display_mode_label, project_output_directory
 from ..paths import is_lmas_development_path, user_documents_directory
-from ..plotting import create_lma_figure
-from ..overlays.satellite import SatelliteOverlayManager, SatelliteOverlayRenderer
-from ..overlays.network import NetworkOverlayManager, NetworkOverlayRenderer
-from ..plotting.common import save_figure
+from ..overlays.satellite.manager import SatelliteOverlayManager
+from ..overlays.satellite.rendering import SatelliteOverlayRenderer
+from ..overlays.network.manager import NetworkOverlayManager
+from ..overlays.network.rendering import NetworkOverlayRenderer
 from ..profile_defaults import profile_save_directory
 from ..help_docs import (
     CHANGELOG,
@@ -73,11 +51,6 @@ from ..profiles import (
     profile_from_specs,
     startup_profile,
 )
-from .animation_dialog import SaveAnimationDialog
-from .data_header_window import DataHeaderWindow
-from .export_product_dialog import ExportProductDialog
-from .array_information_window import ArrayInformationWindow
-from .help_window import HelpDocumentWindow
 from .icon import (
     application_icon,
     charge_analysis_icon,
@@ -86,24 +59,11 @@ from .icon import (
     satellite_overlay_icon,
     selection_lasso_icon,
 )
-from .projection_animation_dialog import SaveProjectionAnimationDialog
-from .profile_dialog import SaveProfileDialog
-from .preferences_dialog import PreferencesDialog
-from .precision_window import PrecisionModeWindow
-from .selection_window import SourceSelectionWindow
-from .source_distributions_window import SourceDistributionsWindow
-from .satellite_overlay_window import SatelliteOverlayWindow
-from .network_overlay_window import NetworkOverlayWindow
 from .controls import ControlPanel
 from .file_browser import LMAFileBrowserDock
 from .plot_widget import DetachedPlotWindow, FigureHost
-from .save_dialog import SaveFigureDialog
 from .window_geometry import Rect, clamp_frame_to_work_area, full_height_tool_geometry
-from .shortcuts import (
-    ShortcutManager,
-    ShortcutReferenceDialog,
-    ShortcutSettingsDialog,
-)
+from .shortcuts import ShortcutManager
 
 SETTINGS_ORGANIZATION = "Langmuir Laboratory"
 SETTINGS_APPLICATION = "LMAS"
@@ -115,6 +75,10 @@ class MainWindow(QMainWindow):
         self._tool_windows: list[QWidget] = []
         self._help_windows: list[QWidget] = []
         self._animation_processes: list[subprocess.Popen] = []
+        # Interactive projection viewers are independent top-level windows.
+        # Retain them explicitly so deferred scene preparation cannot be lost
+        # to garbage collection, and so close events can remove them cleanly.
+        self._projection_animation_windows: list[QWidget] = []
         self._precision_window: PrecisionModeWindow | None = None
         self._selection_window: SourceSelectionWindow | None = None
         self._satellite_overlay_window: SatelliteOverlayWindow | None = None
@@ -145,7 +109,7 @@ class MainWindow(QMainWindow):
         self._suspend_view_limit_sync = False
         self._auto_redraw_timer = QTimer(self)
         self._auto_redraw_timer.setSingleShot(True)
-        self._auto_redraw_timer.setInterval(180)
+        self._auto_redraw_timer.setInterval(100)
         self._auto_redraw_timer.timeout.connect(self._perform_auto_redraw)
         self._satellite_refresh_timer = QTimer(self)
         self._satellite_refresh_timer.setSingleShot(True)
@@ -306,6 +270,7 @@ class MainWindow(QMainWindow):
             )
             return None
         if self._precision_window is None:
+            
             self._precision_window = PrecisionModeWindow(self.figure_host)
         return self._precision_window
 
@@ -437,6 +402,7 @@ class MainWindow(QMainWindow):
             )
             return None
         if self._selection_window is None:
+            
             self._selection_window = SourceSelectionWindow(self.figure_host)
             self._selection_window.charge_default_requested.connect(
                 self._default_charge_coloring
@@ -472,6 +438,8 @@ class MainWindow(QMainWindow):
         # Charge assignments are scientific base colors, not tab-local
         # overlays. Update the current scatter arrays immediately while the
         # ordinary rebuilt figure is queued.
+        from ..source_selection import refresh_charge_source_colors
+
         refresh_charge_source_colors(self.figure_host.figure, state, draw=True)
         if self.controls.color_combo.currentData() in {"charge", "group"}:
             self.schedule_redraw(True)
@@ -609,6 +577,7 @@ class MainWindow(QMainWindow):
             )
             return None
         if self._satellite_overlay_window is None:
+            
             self._satellite_overlay_window = SatelliteOverlayWindow(
                 self.satellite_overlays,
                 self.figure_host,
@@ -681,6 +650,7 @@ class MainWindow(QMainWindow):
             )
             return None
         if self._network_overlay_window is None:
+            
             self._network_overlay_window = NetworkOverlayWindow(
                 self.network_overlays,
                 self.figure_host,
@@ -742,6 +712,8 @@ class MainWindow(QMainWindow):
     def open_export_product(self) -> None:
         """Open the general, extensible scientific-product export interface."""
 
+        from .export_product_dialog import ExportProductDialog
+
         if self.project is None:
             self._show_error(
                 "No data", LMASError("Open LMA data before exporting a product")
@@ -755,6 +727,8 @@ class MainWindow(QMainWindow):
 
     def open_data_file_header(self) -> None:
         """Show literal DAT headers or equivalent dataset metadata."""
+
+        from .data_header_window import DataHeaderWindow
 
         if self.project is None:
             self._show_error(
@@ -773,6 +747,8 @@ class MainWindow(QMainWindow):
         self._data_header_window.activateWindow()
 
     def export_polarity_product(self, format_name: str, scope: str) -> None:
+        from ..polarity_product import export_polarity_csv, export_polarity_netcdf
+
         if self.project is None:
             self._show_error(
                 "No data", LMASError("Open LMA data before exporting polarity data")
@@ -809,6 +785,8 @@ class MainWindow(QMainWindow):
         )
 
     def import_polarity_product(self) -> None:
+        from ..polarity_product import import_polarity_netcdf
+
         if self.project is None:
             self._show_error(
                 "No data",
@@ -922,6 +900,7 @@ class MainWindow(QMainWindow):
         )
 
     def open_source_distributions(self) -> None:
+        
         if self.project is None:
             self.statusBar().showMessage("Open LMA data before viewing source distributions", 5000)
             return
@@ -940,9 +919,13 @@ class MainWindow(QMainWindow):
         self._source_distributions_window.activateWindow()
 
     def open_shortcut_settings(self) -> None:
+        from .shortcuts import ShortcutSettingsDialog
+
         ShortcutSettingsDialog(self.shortcut_manager, self).exec()
 
     def open_keybind_reference(self) -> None:
+        from .shortcuts import ShortcutReferenceDialog
+
         ShortcutReferenceDialog(self.shortcut_manager, self).exec()
 
     def _build_actions(self) -> None:
@@ -1338,6 +1321,7 @@ class MainWindow(QMainWindow):
         return self._last_directory()
 
     def open_preferences(self) -> None:
+        
         raw_output = str(self.settings.value("preferences/output_directory", "")).strip()
         dialog = PreferencesDialog(
             data_directory=self._default_data_directory(),
@@ -1440,6 +1424,8 @@ class MainWindow(QMainWindow):
             return
 
     def _load_files_with_archive_choice(self, paths: list[Path]) -> LMAProject:
+        from ..io.readers import load_lma_files
+
         selections: dict[Path, str] = {}
         while True:
             try:
@@ -1494,6 +1480,8 @@ class MainWindow(QMainWindow):
     def open_project(
         self, path: Path, *, preserve_browser_root: bool = False
     ) -> None:
+        from ..io.project import load_project
+
         self._remember_directory(
             path, update_browser_root=not preserve_browser_root
         )
@@ -1509,6 +1497,8 @@ class MainWindow(QMainWindow):
         )
 
     def open_demo(self) -> None:
+        from ..demo import demo_project
+
         project = demo_project()
         self.active_profile_name = "Packaged hybrid demonstration"
         self.set_project(project)
@@ -1637,6 +1627,7 @@ class MainWindow(QMainWindow):
         self._refresh_profile_menu()
 
     def save_current_profile(self) -> None:
+        
         if self.project is None:
             self._show_error("No data", LMASError("Open LMA data before saving a profile"))
             return
@@ -1743,12 +1734,55 @@ class MainWindow(QMainWindow):
         self.redraw(preserve_view=preserve, show_errors=False)
 
     def redraw(self, *, preserve_view: bool = False, show_errors: bool = True) -> None:
+        from ..plotting import create_lma_figure, update_lma_figure_in_place
+
         if self.project is None:
             return
         self.statusBar().showMessage("Rendering LMA view…")
         try:
             filters = self.controls.filters()
             plot = self.controls.plot_spec()
+            current_figure = self.figure_host.figure
+            changed = (
+                update_lma_figure_in_place(
+                    current_figure,
+                    self.project,
+                    filters=filters,
+                    plot=plot,
+                )
+                if preserve_view and current_figure is not None
+                else None
+            )
+            if changed is not None:
+                self.project.filters = filters
+                self.project.plot = plot
+                linked = self.figure_host.linked_view
+                if linked is not None:
+                    linked.set_behavior(
+                        auto_fit_spatial=plot.auto_fit_spatial,
+                        remap_time_colors=plot.remap_time_colors,
+                    )
+                    linked.refresh_display(
+                        preview_point_limit=(
+                            plot.preview_point_limit
+                            if "preview_point_limit" in changed
+                            else None
+                        ),
+                        update_subset=False,
+                        notify=bool(
+                            {"preview_point_limit", "title"} & set(changed)
+                        ),
+                        redraw=False,
+                    )
+                if changed:
+                    current_figure.canvas.draw_idle()
+                    self.statusBar().showMessage(
+                        "Updated LMA view without rebuilding the figure", 2500
+                    )
+                else:
+                    self.statusBar().showMessage("LMA view is up to date", 1500)
+                return
+
             figure = create_lma_figure(self.project, filters=filters, plot=plot)
         except Exception as exc:
             if show_errors:
@@ -1896,6 +1930,14 @@ class MainWindow(QMainWindow):
         self._refresh_profile_menu()
 
     def save_figure(self) -> None:
+        from ..figure_batch import FigureBatchManifest, write_figure_batch_manifest
+        from ..figure_export import (
+            default_custom_title,
+            save_exact_view,
+            save_theme_variants,
+            theme_variant_paths,
+        )
+        
         if self.project is None or self.figure_host.figure is None:
             return
         # Save the exact visible analysis state, including active group overlays.
@@ -2089,6 +2131,8 @@ class MainWindow(QMainWindow):
         )
 
     def save_project(self) -> None:
+        from ..io.project import save_project
+
         if self.project is None:
             self._show_error("No project", LMASError("Open LMA data before saving a project"))
             return
@@ -2105,6 +2149,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Saved project {destination}", 5000)
 
     def save_project_as(self) -> None:
+        from ..io.project import save_project
+
         if self.project is None:
             self._show_error("No project", LMASError("Open LMA data before saving a project"))
             return
@@ -2128,6 +2174,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Saved exact project to {destination}", 5000)
 
     def detach_figure(self) -> None:
+        from ..plotting import create_lma_figure
+
         if self.project is None:
             return
         try:
@@ -2168,8 +2216,11 @@ class MainWindow(QMainWindow):
     def _current_visualization_snapshot(self):
         if self.project is None:
             raise LMASError("Open LMA data before launching the 3D viewer")
+        from ..visualization.projection_animation import combined_filter_spec
         from ..visualization.snapshot import build_visualization_snapshot
 
+        # Combine the exact live linked bounds with the current quality filters
+        # without redefining Project Home merely because a 3D view was opened.
         selected_ids = None
         controller = self.figure_host.linked_view
         if controller is not None:
@@ -2179,7 +2230,9 @@ class MainWindow(QMainWindow):
                 if values is not None:
                     selected_ids = values
         plot = self.controls.plot_spec()
-        filters = self.controls.filters()
+        filters = combined_filter_spec(
+            self.controls.filters(), self.controls.view_filters()
+        )
         return build_visualization_snapshot(
             self.project,
             filters=filters,
@@ -2222,6 +2275,8 @@ class MainWindow(QMainWindow):
         return True
 
     def _prepare_projection_animation_project(self):
+        from ..io.project import save_project
+
         if self.project is None:
             raise LMASError("Open LMA data before opening a projection animation")
         plot = self.controls.plot_spec()
@@ -2248,32 +2303,51 @@ class MainWindow(QMainWindow):
             )
             return
         try:
-            temp_project, plot, _stem = self._prepare_projection_animation_project()
+            self._commit_live_project_state()
+            project = self.project
+            plot = self.controls.plot_spec()
         except Exception as exc:
             self._show_error("Could not prepare the projection animation", exc)
             return
-        args = [
-            "view-projections",
-            "--project",
-            str(temp_project),
-            "--display-mode",
-            plot.three_d_display_mode,
-            "--trail-ms",
-            f"{plot.three_d_trail_ms:g}",
-            "--afterimage-ms",
-            f"{plot.three_d_afterimage_ms:g}",
-            "--fps",
-            str(plot.three_d_playback_fps),
-            "--duration-s",
-            f"{plot.three_d_playback_duration_s:g}",
-        ]
-        if not self._start_detached_lmas(args):
-            self._show_error(
-                "Could not launch projection animation",
-                LMASError("The detached LMAS projection viewer did not start"),
+
+        # The viewer creates a lightweight loading shell immediately and then
+        # prepares its Matplotlib scene on the next event-loop turn. Keeping the
+        # viewer in this process reuses the loaded Project and avoids a second
+        # Python startup, temporary project file, and source-file reload.
+        self.statusBar().showMessage("Preparing interactive projection animation…")
+
+        def create_viewer() -> None:
+            try:
+                from .projection_animation_viewer import ProjectionAnimationViewer
+
+                window = ProjectionAnimationViewer(
+                    project,
+                    display_mode=plot.three_d_display_mode,
+                    trail_ms=plot.three_d_trail_ms,
+                    afterimage_ms=plot.three_d_afterimage_ms,
+                    fps=plot.three_d_playback_fps,
+                    duration_s=plot.three_d_playback_duration_s,
+                    point_limit=max(0, int(plot.preview_point_limit)),
+                    parent=self,
+                )
+            except Exception as exc:
+                self._show_error("Could not prepare the projection animation", exc)
+                self.statusBar().showMessage("Projection animation failed", 5000)
+                return
+            self._projection_animation_windows.append(window)
+            window.destroyed.connect(
+                lambda *_args, w=window: self._projection_animation_windows.remove(w)
+                if w in self._projection_animation_windows
+                else None
             )
-            return
-        self.statusBar().showMessage("Opened interactive projection animation", 7000)
+            window.show()
+            window.raise_()
+            window.activateWindow()
+            self.statusBar().showMessage(
+                "Preparing interactive projection animation…", 7000
+            )
+
+        QTimer.singleShot(0, create_viewer)
 
     def open_interactive_3d(self) -> None:
         if not self._visualization_dependencies_available():
@@ -2308,6 +2382,8 @@ class MainWindow(QMainWindow):
             str(plot.three_d_playback_fps),
             "--duration-s",
             f"{plot.three_d_playback_duration_s:g}",
+            "--point-limit",
+            str(max(0, int(plot.preview_point_limit))),
             "--camera-output",
             str(camera_output),
         ]
@@ -2327,6 +2403,9 @@ class MainWindow(QMainWindow):
         )
 
     def save_projection_animation(self) -> None:
+        from ..animation_batch import AnimationBatchManifest, write_batch_manifest
+        from ..figure_export import default_custom_title
+        
         if self.project is None:
             self._show_error("No data", LMASError("Open LMA data before saving an animation"))
             return
@@ -2453,6 +2532,9 @@ class MainWindow(QMainWindow):
         )
 
     def save_3d_animation(self) -> None:
+        from ..animation_batch import AnimationBatchManifest, write_batch_manifest
+        from .animation_dialog import SaveAnimationDialog
+
         if not self._visualization_dependencies_available():
             return
         if self.project is None:
@@ -2577,6 +2659,8 @@ class MainWindow(QMainWindow):
         )
 
     def open_array_information(self) -> None:
+        from .array_information_window import ArrayInformationWindow
+
         if self.project is None:
             self._show_error(
                 "No data",
@@ -2595,6 +2679,8 @@ class MainWindow(QMainWindow):
         window.activateWindow()
 
     def open_help_document(self, document_name: str) -> None:
+        from .help_window import HelpDocumentWindow
+
         try:
             window = HelpDocumentWindow(document_name, self)
         except Exception as exc:
@@ -2641,6 +2727,12 @@ class MainWindow(QMainWindow):
             self._precision_window.hide_precision_mode()
         if self._selection_window is not None:
             self._selection_window.hide_selection_mode()
+        for window in list(self._projection_animation_windows):
+            try:
+                window.close()
+            except Exception:
+                pass
+        self._projection_animation_windows.clear()
         self.settings.setValue("window/geometry", self.saveGeometry())
         self.settings.setValue("window/splitter_state", self.splitter.saveState())
         self.settings.setValue("browser/root", str(self.file_browser.root))

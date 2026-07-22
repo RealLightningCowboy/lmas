@@ -19,35 +19,68 @@ def _stylesheet() -> str:
     """
 
 
-def run_application(*, files: list[Path] | None = None, project_path: Path | None = None, demo: bool = False, profile_name: str | None = None, reader_backend: str = "auto") -> int:
+def run_application(
+    *,
+    files: list[Path] | None = None,
+    project_path: Path | None = None,
+    demo: bool = False,
+    profile_name: str | None = None,
+    reader_backend: str = "auto",
+) -> int:
     try:
-        from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import QTimer, Qt
+        from PySide6.QtWidgets import QApplication, QLabel
     except (ImportError, OSError) as exc:
         raise DependencyError(
             "The LMAS desktop viewer requires PySide6. Install it with "
             "mamba install -c conda-forge pyside6."
         ) from exc
-    from .main_window import MainWindow
-    from .panel_theme import apply_dark_palette
-    from .icon import application_icon
 
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("Lightning Mapping Array Suite")
     app.setOrganizationName("Langmuir Laboratory")
     app.setDesktopFileName("lmas")
-    app.setWindowIcon(application_icon())
     app.setStyle("Fusion")
+
+    # Give immediate feedback before importing and constructing the full GUI.
+    # This is deliberately a tiny Qt-only shell; the scientific/plotting stack
+    # remains lazy until MainWindow or the first figure actually needs it.
+    startup = QLabel("Starting Lightning Mapping Array Suite…")
+    startup.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    startup.setMinimumSize(420, 120)
+    startup.setWindowFlag(Qt.WindowType.SplashScreen, True)
+    startup.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+    startup.show()
+    startup.raise_()
+    startup.activateWindow()
+    app.setActiveWindow(startup)
+    app.processEvents()
+
+    from .icon import application_icon
+    from .main_window import MainWindow
+    from .panel_theme import apply_dark_palette
+
+    app.setWindowIcon(application_icon())
     apply_dark_palette(app)
     app.setStyleSheet(_stylesheet())
     window = MainWindow(profile_name=profile_name, reader_backend=reader_backend)
     window.show()
-    if project_path is not None:
-        window.open_project(Path(project_path))
-    elif files:
-        window.open_files([Path(path) for path in files])
-    elif demo:
-        window.open_demo()
-    return app.exec()
+    startup.close()
+
+    # Let Qt paint and activate the application shell before synchronous reader
+    # and first-figure work begins. This does not pretend the data are already
+    # loaded, but it removes the long blank interval before the window appears.
+    def load_initial_content() -> None:
+        if project_path is not None:
+            window.open_project(Path(project_path))
+        elif files:
+            window.open_files([Path(path) for path in files])
+        elif demo:
+            window.open_demo()
+
+    if project_path is not None or files or demo:
+        QTimer.singleShot(25, load_initial_content)
+    return int(app.exec())
 
 
 def build_parser() -> argparse.ArgumentParser:
